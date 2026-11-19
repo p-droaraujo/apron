@@ -19,6 +19,14 @@ add_library(apron_core
   src/core/runs.cpp
   src/core/tasks.cpp
 )
+
+# A TUI: terminal, grade de células e o Andamento.
+add_library(apron_tui
+  src/tui/term.cpp
+  src/tui/screen.cpp
+  src/tui/andamento.cpp
+)
+target_link_libraries(apron_tui PUBLIC apron_core)
 target_include_directories(apron_core PUBLIC src)
 
 add_executable(apron
@@ -27,10 +35,11 @@ add_executable(apron
   src/cli/cmd_report.cpp
   src/cli/cmd_log.cpp
   src/cli/cmd_tasks.cpp
+  src/cli/cmd_ui.cpp
 )
-target_link_libraries(apron PRIVATE apron_core)
+target_link_libraries(apron PRIVATE apron_tui)
 
 enable_testing()
-add_executable(apron_tests tests/test_main.cpp tests/test_json.cpp tests/test_events.cpp tests/test_tasks.cpp)
-target_link_libraries(apron_tests PRIVATE apron_core)
+add_executable(apron_tests tests/test_main.cpp tests/test_json.cpp tests/test_events.cpp tests/test_tasks.cpp tests/test_tui.cpp)
+target_link_libraries(apron_tests PRIVATE apron_tui)
 add_test(NAME core COMMAND apron_tests)

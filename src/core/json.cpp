@@ -3,6 +3,7 @@
 #include <cctype>
 #include <charconv>
 #include <cmath>
+#include <cstdlib>
 #include <cstdio>
 
 namespace apron::json {
@@ -158,9 +159,11 @@ class Parser {
     while (pos_ < s_.size() && (std::isdigit(static_cast<unsigned char>(s_[pos_])) || s_[pos_] == '.' ||
                                 s_[pos_] == 'e' || s_[pos_] == 'E' || s_[pos_] == '-' || s_[pos_] == '+'))
       ++pos_;
-    double d = 0;
-    auto [ptr, ec] = std::from_chars(s_.data() + start, s_.data() + pos_, d);
-    if (ec != std::errc() || ptr != s_.data() + pos_ || start == pos_) {
+    // strtod em vez de from_chars: libc++ antigas (macOS) não têm from_chars para double.
+    std::string token(s_.substr(start, pos_ - start));
+    char* end = nullptr;
+    double d = std::strtod(token.c_str(), &end);
+    if (start == pos_ || end != token.c_str() + token.size()) {
       fail("número inválido");
       return std::nullopt;
     }

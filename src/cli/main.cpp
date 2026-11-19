@@ -59,6 +59,8 @@ namespace {
 
 constexpr const char* kUsage = R"(apron — operar agentes e acompanhar projetos
 
+  apron                         abre o Andamento no terminal
+
 Execuções (docs/agent-protocol.md):
   apron run start <tarefa> [--agent nome] [--intent "frase"] [--force]
   apron run finish [--result done|failed|abandoned] "resumo"
@@ -76,9 +78,10 @@ Variáveis: APRON_AGENT (nome do agente), APRON_MACHINE (nome da máquina), NO_C
 
 int main(int argc, char** argv) {
   using namespace apron::cli;
-  if (argc < 2 || !std::strcmp(argv[1], "-h") || !std::strcmp(argv[1], "--help") || !std::strcmp(argv[1], "help")) {
+  if (argc < 2) return cmd_ui(Args{});
+  if (!std::strcmp(argv[1], "-h") || !std::strcmp(argv[1], "--help") || !std::strcmp(argv[1], "help")) {
     std::fputs(kUsage, stdout);
-    return argc < 2 ? 1 : 0;
+    return 0;
   }
   std::string cmd = argv[1];
   if (cmd == "run") return cmd_run(Args::parse(argc, argv, 2, {"force"}));

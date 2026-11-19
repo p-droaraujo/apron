@@ -52,6 +52,7 @@ int cmd_report(const Args& args);
 int cmd_log(const Args& args);
 int cmd_runs(const Args& args);
 int cmd_tasks(const Args& args);
+int cmd_ui(const Args& args);
 
 // Atualiza o estado de uma tarefa no tasks.md; false se a tarefa não estiver lá.
 bool sync_task(const Project& project, const std::string& id, char state, const std::string& por);

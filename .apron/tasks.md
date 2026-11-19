@@ -15,7 +15,7 @@ O plano do próprio Apron, no formato descrito em `docs/agent-protocol.md`.
   pronto: `apron run start T2` recusa tarefa sem escopo ou pronto e marca `[~]` com `por:`
   checks: build, test
 
-- [ ] T11 TUI do Andamento local e somente leitura: `apron` sem argumentos abre a tela
+- [x] T11 TUI do Andamento local e somente leitura: `apron` sem argumentos abre a tela
   escopo: CMakeLists.txt, src/tui/**, src/cli/**, tests/**, README.md
   depende: T2
   pronto: `apron` mostra as faixas plano, executando, portões e feito a partir do tasks.md e dos eventos, atualiza sozinho e abre o log de uma execução

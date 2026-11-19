@@ -39,7 +39,7 @@ Apron's own plan, in the format described in `docs/agent-protocol.md`.
   done-when: `apron run finish` records the touched files and the ones that left the scope
   checks: build, test
 
-- [ ] T5 Claude Code hooks call `apron report` for the agent's state
+- [x] T5 Claude Code hooks call `apron report` for the agent's state
   scope: integrations/claude-code/**, docs/**
   depends: T1
   done-when: an example `.claude/settings.json` makes Claude Code emit step, ask and run.finished by itself

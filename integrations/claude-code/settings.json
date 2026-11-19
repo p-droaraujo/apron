@@ -1,0 +1,19 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      { "hooks": [{ "type": "command", "command": "\"$CLAUDE_PROJECT_DIR\"/integrations/claude-code/apron-hook.sh" }] }
+    ],
+    "PreToolUse": [
+      { "matcher": "*", "hooks": [{ "type": "command", "command": "\"$CLAUDE_PROJECT_DIR\"/integrations/claude-code/apron-hook.sh" }] }
+    ],
+    "Notification": [
+      { "hooks": [{ "type": "command", "command": "\"$CLAUDE_PROJECT_DIR\"/integrations/claude-code/apron-hook.sh" }] }
+    ],
+    "Stop": [
+      { "hooks": [{ "type": "command", "command": "\"$CLAUDE_PROJECT_DIR\"/integrations/claude-code/apron-hook.sh" }] }
+    ],
+    "SessionEnd": [
+      { "hooks": [{ "type": "command", "command": "\"$CLAUDE_PROJECT_DIR\"/integrations/claude-code/apron-hook.sh" }] }
+    ]
+  }
+}

@@ -51,10 +51,10 @@ Apron's own plan, in the format described in `docs/agent-protocol.md`.
   done-when: `aprond` starts, `apron new` creates a session and `apron ls` lists it with the foreground agent
   checks: build, test
 
-- [ ] T7 Events go to the daemon when it exists, with the local file as fallback
-  scope: src/**, tests/**
+- [ ] T7 The daemon learns about every project and run on its machine; the local file stays the source
+  scope: CMakeLists.txt, src/**, tests/**, docs/agent-protocol.md, README.md
   depends: T6
-  done-when: with `aprond` running, `apron report` delivers over the socket; without it, it writes to `.apron/runs/`
+  done-when: every event is still written to `.apron/runs/`; if `aprond` is running it is told too, `apron projects` lists the machine's projects with their runs, and a run started inside an `apron` session records which session it is
   checks: build, test
 
 - [ ] T8 Hub: token pairing, its own CA and outbound mTLS connections

@@ -90,8 +90,8 @@ Apron's own plan, in the format described in `docs/agent-protocol.md`.
   done-when: `v` in the TUI opens a queue of finished runs, failing checks and scope drift first; Enter shows the instruments and the changed files; m merges the run's branch into main, r writes the person's comment as the run's next prompt note, d discards
   checks: build, test
 
-- [ ] T15 Activity tab: one timeline of the events of every project on the machine
-  scope: CMakeLists.txt, src/tui/**, src/cli/**, src/core/**, tests/**
+- [x] T15 Activity tab: one timeline of the events of every project on the machine
+  scope: CMakeLists.txt, src/tui/**, src/cli/**, src/core/**, tests/**, README.md
   depends: T7, T11
   done-when: `y` in the TUI shows the latest events of all projects aprond knows, newest first, and updates live
   checks: build, test

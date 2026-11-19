@@ -106,3 +106,29 @@ TEST("progress: tasks and runs land in the right lanes") {
   CHECK(screen_has(s, "◐ 1"));
   fs::remove_all(root);
 }
+
+TEST("activity: events of several projects, newest first") {
+  fs::path a = fs::temp_directory_path() / ("apron-act-a-" + std::to_string(::getpid()));
+  fs::path b = fs::temp_directory_path() / ("apron-act-b-" + std::to_string(::getpid()));
+  for (const auto& d : {a, b}) fs::create_directories(d / ".apron");
+  auto put = [](const fs::path& root, const std::string& run, int64_t ts, const std::string& msg) {
+    Event e;
+    e.ts_ms = ts;
+    e.run = run;
+    e.task = "T1";
+    e.kind = Kind::Step;
+    e.msg = msg;
+    append_event(Project{root}.run_file(run), e);
+  };
+  put(a, "r-a", 1000, "first");
+  put(b, "r-b", 3000, "third");
+  put(a, "r-a", 2000, "second");
+  auto items = load_activity({a.string(), b.string()}, 10);
+  CHECK_EQ(items.size(), size_t(3));
+  CHECK_EQ(items[0].event.msg, std::string("third"));
+  CHECK_EQ(items[0].project, b.filename().string());
+  CHECK_EQ(items[2].event.msg, std::string("first"));
+  CHECK_EQ(load_activity({a.string(), b.string()}, 2).size(), size_t(2));
+  fs::remove_all(a);
+  fs::remove_all(b);
+}

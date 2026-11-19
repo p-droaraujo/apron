@@ -55,6 +55,14 @@ void render_log(Screen& screen, const Project& project, const std::string& run, 
 // The fields of a task with no run.
 void render_task(Screen& screen, const Project& project, const std::string& task);
 
+// Activity: the newest events of every project, newest first.
+struct ActivityItem {
+  std::string project;
+  Event event;
+};
+std::vector<ActivityItem> load_activity(const std::vector<std::string>& roots, size_t limit);
+void render_activity(Screen& screen, const std::vector<ActivityItem>& items, int scroll, int64_t now_ms);
+
 // Review: the queue of finished runs, and one run with its instruments.
 void render_review_list(Screen& screen, const std::vector<RunSummary>& queue, int index, int64_t now_ms);
 void render_review(Screen& screen, const Project& project, const RunSummary& run, const std::string& stat,

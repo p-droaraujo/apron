@@ -4,6 +4,7 @@
 #include <algorithm>
 
 #include "cli/common.hpp"
+#include "cli/daemon_client.hpp"
 #include "core/review.hpp"
 #include "core/time.hpp"
 #include "tui/progress.hpp"
@@ -12,6 +13,23 @@
 namespace apron::cli {
 
 namespace {
+
+// Every project this machine knows: aprond's registry, else just this one.
+std::vector<std::string> machine_projects(const Project& here) {
+  std::vector<std::string> roots{here.root.string()};
+  DaemonClient c;
+  std::string err;
+  if (!c.connect(false, &err)) return roots;
+  json::Object req;
+  req.emplace_back("cmd", "projects.list");
+  auto reply = c.request(std::move(req), &err);
+  if (const json::Value* list = reply ? reply->find("projects") : nullptr)
+    for (const auto& p : list->arr()) {
+      std::string root = p.get_str("root");
+      if (!root.empty() && root != roots.front()) roots.push_back(root);
+    }
+  return roots;
+}
 
 void pop_utf8(std::string& s) {
   while (!s.empty()) {
@@ -38,13 +56,16 @@ int cmd_ui(const Args&) {
   tui::View view;
   tui::clamp_selection(model, view);
 
-  enum class Mode { Progress, Log, Task, Review, ReviewRun } mode = Mode::Progress;
+  enum class Mode { Progress, Log, Task, Review, ReviewRun, Activity } mode = Mode::Progress;
+  std::vector<tui::ActivityItem> activity;
+  int activity_scroll = 0;
   std::string open_run, open_task, stat, status, input;
   bool typing = false;
   int scroll = 0, review_index = 0;
   int64_t last_load = timeutil::now_ms();
 
   auto reload = [&] {
+    if (mode == Mode::Activity) activity = tui::load_activity(machine_projects(*project), 500);
     model = tui::load_model(*project);
     queue = review_queue(*project);
     tui::clamp_selection(model, view);
@@ -74,6 +95,10 @@ int cmd_ui(const Args&) {
         tab = 1;
         tui::render_review_list(screen, queue, review_index, now);
         break;
+      case Mode::Activity:
+        tab = 2;
+        tui::render_activity(screen, activity, activity_scroll, now);
+        break;
       case Mode::ReviewRun: {
         tab = 1;
         auto it = std::find_if(queue.begin(), queue.end(), [&](const RunSummary& r) { return r.id == open_run; });
@@ -82,8 +107,8 @@ int cmd_ui(const Args&) {
         break;
       }
     }
-    if (mode == Mode::Progress || mode == Mode::Review || mode == Mode::ReviewRun)
-      tui::render_tabs(screen, tab, static_cast<int>(queue.size()), false);
+    if (mode == Mode::Progress || mode == Mode::Review || mode == Mode::ReviewRun || mode == Mode::Activity)
+      tui::render_tabs(screen, tab, static_cast<int>(queue.size()), true);
     term.write(screen.flush());
 
     tui::KeyEvent k = term.poll(100);
@@ -112,8 +137,16 @@ int cmd_ui(const Args&) {
     }
 
     bool quit = k.key == tui::Key::Char && k.ch == 'q';
-    if (k.key == tui::Key::Char && k.ch == 'v' && mode == Mode::Progress) {
+    // Tabs: v Review, y Activity, Esc back to Progress.
+    bool on_tab = mode == Mode::Progress || mode == Mode::Review || mode == Mode::Activity;
+    if (on_tab && k.key == tui::Key::Char && k.ch == 'v') {
       mode = Mode::Review;
+      continue;
+    }
+    if (on_tab && k.key == tui::Key::Char && k.ch == 'y') {
+      mode = Mode::Activity;
+      activity_scroll = 0;
+      activity = tui::load_activity(machine_projects(*project), 500);
       continue;
     }
     switch (mode) {
@@ -157,6 +190,12 @@ int cmd_ui(const Args&) {
         if (quit || k.key == tui::Key::Esc) mode = Mode::Progress;
         else if (k.key == tui::Key::Up || (k.key == tui::Key::Char && k.ch == 'k')) scroll = std::max(0, scroll - 1);
         else if (k.key == tui::Key::Down || (k.key == tui::Key::Char && k.ch == 'j')) ++scroll;
+        break;
+      case Mode::Activity:
+        if (quit) return 0;
+        if (k.key == tui::Key::Esc) mode = Mode::Progress;
+        else if (k.key == tui::Key::Up || (k.key == tui::Key::Char && k.ch == 'k')) activity_scroll = std::max(0, activity_scroll - 1);
+        else if (k.key == tui::Key::Down || (k.key == tui::Key::Char && k.ch == 'j')) ++activity_scroll;
         break;
       case Mode::Review:
         if (quit) return 0;

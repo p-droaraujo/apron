@@ -225,7 +225,7 @@ void render_progress(Screen& sc, const Model& m, const View& v, int64_t now) {
   if (m.waiting) bx += sc.put(bx, sy, "◐ " + std::to_string(m.waiting), kAmber) + 2;
   if (m.working) bx += sc.put(bx, sy, "● " + std::to_string(m.working), kBlue) + 2;
   if (m.blocked) bx += sc.put(bx, sy, "⊘ " + std::to_string(m.blocked), kDim) + 2;
-  std::string hint = v.help ? tr("←→↑↓ move · enter open · esc back · q quit") : tr("? help");
+  std::string hint = v.help ? tr("←→↑↓ move · enter open · v review · y activity · q quit") : tr("? help");
   sc.put(W - text_width(hint) - 1, sy, hint, kDim);
 }
 
@@ -418,6 +418,68 @@ void render_review(Screen& sc, const Project& project, const RunSummary& r, cons
   }
   sc.put(0, H - 1, " APRON ", kBadge);
   std::string hint = tr("m merge · r return with a comment · d discard · esc back");
+  sc.put(W - text_width(hint) - 1, H - 1, hint, kDim);
+}
+
+std::vector<ActivityItem> load_activity(const std::vector<std::string>& roots, size_t limit) {
+  std::vector<ActivityItem> out;
+  for (const auto& root : roots) {
+    Project p{root};
+    std::string name = p.root.filename().string();
+    std::error_code ec;
+    for (const auto& entry : std::filesystem::directory_iterator(p.runs_dir(), ec)) {
+      if (entry.path().extension() != ".jsonl") continue;
+      for (auto& e : load_events(entry.path())) out.push_back({name, std::move(e)});
+    }
+  }
+  std::sort(out.begin(), out.end(), [](const ActivityItem& a, const ActivityItem& b) { return a.event.ts_ms > b.event.ts_ms; });
+  if (out.size() > limit) out.resize(limit);
+  return out;
+}
+
+void render_activity(Screen& sc, const std::vector<ActivityItem>& items, int scroll, int64_t now) {
+  sc.clear();
+  int W = sc.width(), H = sc.height();
+  if (items.empty()) sc.put(1, 2, tr("no activity yet"), kDim);
+  int y = 2;
+  for (size_t i = static_cast<size_t>(std::max(0, scroll)); i < items.size() && y < H - 1; ++i, ++y) {
+    const Event& e = items[i].event;
+    std::string g = "·", msg = e.msg;
+    Style gs = kBlue, ms = kSoft;
+    switch (e.kind) {
+      case Kind::RunStarted: g = "▶"; msg = e.extra_str("intent"); ms = kText; break;
+      case Kind::Step: break;
+      case Kind::Ask: g = "◐"; gs = ms = kAmber; break;
+      case Kind::Blocked: g = "⊘"; gs = kDim; msg = "(" + e.extra_str("cause") + ") " + msg; break;
+      case Kind::Note: g = "›"; gs = kDim; ms = kDim; break;
+      case Kind::Check: {
+        const json::Value* ok = e.extra_find("ok");
+        bool passed = ok && ok->is_bool() && ok->boolean();
+        g = passed ? "✓" : "✕";
+        gs = passed ? kSoft : kRed;
+        msg = "check " + e.extra_str("name");
+        break;
+      }
+      case Kind::RunFinished: g = "■"; gs = kText; ms = kText; msg = e.extra_str("result") + (e.msg.empty() ? "" : " · " + e.msg); break;
+      case Kind::Review: {
+        std::string action = e.extra_str("action");
+        g = action == "returned" ? "↩" : action == "merged" ? "✓" : "–";
+        gs = action == "returned" ? kAmber : kSoft;
+        msg = tr(action == "returned" ? "returned to the agent" : action) + (e.msg.empty() ? "" : " · " + e.msg);
+        break;
+      }
+    }
+    std::string when = ago(now, e.ts_ms);
+    sc.put(1, y, when, kDim);
+    sc.put(8, y, g, gs);
+    int x = 10 + sc.put(10, y, fit(items[i].project, 14), kSoft);
+    x = std::max(x + 1, 25);
+    x += 1 + sc.put(x, y, e.task, kBold);
+    x += 1 + sc.put(x, y, fit(e.agent + "@" + e.machine, 18), kDim);
+    sc.put(x, y, fit(msg, W - x - 1), ms);
+  }
+  sc.put(0, H - 1, " APRON ", kBadge);
+  std::string hint = tr("↑↓ scroll · esc back");
   sc.put(W - text_width(hint) - 1, H - 1, hint, kDim);
 }
 

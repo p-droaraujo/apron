@@ -22,6 +22,7 @@ struct RunSummary {
   std::string agent;
   std::string machine;
   std::string intent;
+  std::string session;  // the aprond session the run lives in, if any
   int64_t started_ms = 0;
   int64_t last_ms = 0;
   RunState state = RunState::Working;

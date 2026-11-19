@@ -2,6 +2,7 @@
 #include <unistd.h>
 
 #include <algorithm>
+#include <cstdlib>
 
 #include "cli/common.hpp"
 #include "cli/daemon_client.hpp"
@@ -163,7 +164,18 @@ int cmd_ui(const Args&) {
             if (items.empty()) break;
             const auto& it = items[static_cast<size_t>(view.index)];
             if (it.review) open_review(it.run);
-            else if (!it.run.empty()) {
+            else if (!it.session.empty() && it.state != RunState::Done && it.machine == machine_name()) {
+              // The agent's terminal: hand the screen over, take it back after Ctrl-].
+              term.suspend();
+              int rc = attach_session(static_cast<uint32_t>(std::atoi(it.session.c_str())));
+              term.resume();
+              screen.resize(term.width(), term.height());
+              if (rc != 0) {
+                open_run = it.run;  // the session is gone: show the run instead
+                scroll = 0;
+                mode = Mode::Log;
+              }
+            } else if (!it.run.empty()) {
               open_run = it.run;
               scroll = 0;
               mode = Mode::Log;
@@ -179,6 +191,14 @@ int cmd_ui(const Args&) {
             else if (k.ch == 'k') --view.index;
             else if (k.ch == 'j') ++view.index;
             else if (k.ch == '?') view.help = !view.help;
+            else if (k.ch == 'o') {  // the run's timeline, even when Enter would attach
+              const auto& items = model.lanes[view.lane];
+              if (!items.empty() && !items[static_cast<size_t>(view.index)].run.empty()) {
+                open_run = items[static_cast<size_t>(view.index)].run;
+                scroll = 0;
+                mode = Mode::Log;
+              }
+            }
             break;
           default: break;
         }

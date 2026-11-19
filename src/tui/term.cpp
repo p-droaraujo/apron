@@ -61,6 +61,26 @@ Terminal::Terminal() {
 
 Terminal::~Terminal() { restore(); }
 
+void Terminal::suspend() {
+  restore();
+  write("\x1b[H\x1b[2J");  // a blank screen for the session to paint on
+}
+
+void Terminal::resume() {
+  termios raw = g_saved;
+  raw.c_iflag &= ~static_cast<tcflag_t>(BRKINT | ICRNL | INPCK | ISTRIP | IXON);
+  raw.c_oflag &= ~static_cast<tcflag_t>(OPOST);
+  raw.c_cflag |= CS8;
+  raw.c_lflag &= ~static_cast<tcflag_t>(ECHO | ICANON | IEXTEN | ISIG);
+  raw.c_cc[VMIN] = 0;
+  raw.c_cc[VTIME] = 0;
+  tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw);
+  g_active = true;
+  std::signal(SIGWINCH, on_winch);  // the attached session installed its own
+  write(kEnter);
+  query_size();
+}
+
 void Terminal::query_size() {
   winsize ws{};
   if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) == 0 && ws.ws_col > 0) {

@@ -96,7 +96,7 @@ Apron's own plan, in the format described in `docs/agent-protocol.md`.
   done-when: `y` in the TUI shows the latest events of all projects aprond knows, newest first, and updates live
   checks: build, test
 
-- [ ] T16 From a card to the agent's terminal: Enter on a running card attaches to its session
+- [x] T16 From a card to the agent's terminal: Enter on a running card attaches to its session
   scope: CMakeLists.txt, src/tui/**, src/cli/**, tests/**
   depends: T7, T11
   done-when: Enter on a running card whose run recorded a session leaves the TUI, attaches to that session, and Ctrl-] comes back to the TUI

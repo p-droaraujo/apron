@@ -81,6 +81,8 @@ Model load_model(const Project& project) {
     it.run = r.id;
     it.state = r.state;
     it.who = r.agent + "@" + r.machine;
+    it.session = r.session;
+    it.machine = r.machine;
     auto found = by_id.find(r.task);
     it.title = plain(found != by_id.end() ? found->second->title : r.intent);
     it.detail = r.last_msg;
@@ -207,6 +209,7 @@ void render_progress(Screen& sc, const Model& m, const View& v, int64_t now) {
         sc.put(lx, y + r, "▌", with_bg(bar, sel));
       }
       std::string dur = it.since_ms ? ago(now, it.since_ms) : "";
+      if (!it.session.empty() && it.lane == Lane::Executando) dur = "⌨ " + dur;  // Enter opens its terminal
       sc.put(lx + 2, y, state_glyph(shown), with_bg(gstyle, sel));
       sc.put(lx + 4, y, fit(it.who.empty() ? "—" : it.who, cw - 6 - text_width(dur)), with_bg(kSoft, sel));
       sc.put(lx + cw - text_width(dur), y, dur, with_bg(kDim, sel));
@@ -225,7 +228,7 @@ void render_progress(Screen& sc, const Model& m, const View& v, int64_t now) {
   if (m.waiting) bx += sc.put(bx, sy, "◐ " + std::to_string(m.waiting), kAmber) + 2;
   if (m.working) bx += sc.put(bx, sy, "● " + std::to_string(m.working), kBlue) + 2;
   if (m.blocked) bx += sc.put(bx, sy, "⊘ " + std::to_string(m.blocked), kDim) + 2;
-  std::string hint = v.help ? tr("←→↑↓ move · enter open · v review · y activity · q quit") : tr("? help");
+  std::string hint = v.help ? tr("←→↑↓ move · enter open (⌨ the agent's terminal) · o log · v review · y activity · q quit") : tr("? help");
   sc.put(W - text_width(hint) - 1, sy, hint, kDim);
 }
 

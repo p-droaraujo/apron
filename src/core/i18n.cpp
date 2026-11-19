@@ -89,6 +89,7 @@ const std::unordered_map<std::string_view, std::string_view>& pt_br() {
       {"warning: {}", "aviso: {}"},
       {"nothing to review", "nada para revisar"},
       {"no activity yet", "nenhuma atividade ainda"},
+      {"←→↑↓ move · enter open (⌨ the agent's terminal) · o log · v review · y activity · q quit", "←→↑↓ navegar · enter abrir (⌨ o terminal do agente) · o log · v revisão · y atividade · q sair"},
       {"↑↓ move · enter open · esc back · q quit", "↑↓ navegar · enter abrir · esc voltar · q sair"},
       {"outside", "fora"},
       {"usage: apron review [<run> merge|return \"comment\"|discard]", "uso: apron review [<execução> merge|return \"comentário\"|discard]"},

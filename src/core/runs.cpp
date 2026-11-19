@@ -38,6 +38,7 @@ RunSummary summarize(const std::string& id, const std::vector<Event>& events) {
     switch (e.kind) {
       case Kind::RunStarted:
         s.intent = e.extra_str("intent");
+        s.session = e.extra_str("session");
         s.state = RunState::Working;
         break;
       case Kind::Step:

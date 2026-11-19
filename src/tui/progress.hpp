@@ -21,6 +21,8 @@ struct Item {
   std::string who;     // agent@machine
   std::string detail;  // last sentence, dependencies or reason
   std::string run;     // run id, if any
+  std::string session; // the agent's terminal (aprond session id), if the run has one
+  std::string machine; // where that session lives
   RunState state = RunState::Working;
   bool ready = false;  // open task whose dependencies are done
   bool from_run = false;

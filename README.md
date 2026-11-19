@@ -46,6 +46,8 @@ T2 · claude@nexus · 12m04s · ✓ feita
 
 Finished runs wait in Gates until you review them. `v` opens the Review tab: failing checks and scope drift first; Enter shows the trajectory, the checks, the scope and the changed files; `m` merges into `main`, `r` returns the run with a comment the next agent reads, `d` discards it. `apron review` does the same from the shell.
 
+Enter on a running card marked ⌨ takes over the agent's terminal (the run was started inside an `apron new` session on this machine); Ctrl-] brings you back to the board. `o` opens the run's log instead.
+
 `y` opens the Activity tab: one timeline of every project on the machine that `aprond` knows, newest first.
 
 ## Sessions that outlive your terminal

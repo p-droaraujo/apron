@@ -69,6 +69,19 @@ int attach(DaemonClient& c, uint32_t id) {
 
   int rc = 0;
   bool done = false;
+  auto drain = [&] {
+    while (auto f = c.next(0)) {
+      if (f->type == proto::Type::Data && f->channel == id) {
+        ssize_t w = ::write(STDOUT_FILENO, f->payload.data(), f->payload.size());
+        (void)w;
+      } else if (f->type == proto::Type::Ctrl) {
+        auto v = json::parse(f->payload);
+        if (v && v->get_str("event") == "session.exited") done = true;
+      }
+    }
+  };
+  // The replay often arrives with the attach reply and sits queued: poll() would never see it.
+  drain();
   while (!done) {
     if (g_winch.exchange(false)) {
       term_size(cols, rows);
@@ -93,15 +106,7 @@ int attach(DaemonClient& c, uint32_t id) {
       if (!in.empty()) c.send({proto::Type::Data, id, in});
     }
     if (fds[1].revents & (POLLIN | POLLHUP)) {
-      while (auto f = c.next(0)) {
-        if (f->type == proto::Type::Data && f->channel == id) {
-          ssize_t w = ::write(STDOUT_FILENO, f->payload.data(), f->payload.size());
-          (void)w;
-        } else if (f->type == proto::Type::Ctrl) {
-          auto v = json::parse(f->payload);
-          if (v && v->get_str("event") == "session.exited") done = true;
-        }
-      }
+      drain();
       if (fds[1].revents & POLLHUP) {
         rc = 1;
         break;
@@ -211,6 +216,12 @@ int cmd_daemon(const Args& args) {
 }
 
 }  // namespace
+
+int attach_session(uint32_t id) {
+  auto c = connect(false);
+  if (!c) return 1;
+  return attach(*c, id);
+}
 
 int cmd_sessions(const std::string& cmd, const Args& args) {
   if (cmd == "new") return cmd_new(args);

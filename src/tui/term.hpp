@@ -27,6 +27,9 @@ class Terminal {
   // Waits up to `timeout_ms` for a key or a resize.
   KeyEvent poll(int timeout_ms);
   void write(const std::string& bytes);
+  // Hands the terminal to something else (an attached session) and takes it back.
+  void suspend();
+  void resume();
 
  private:
   int w_ = 80, h_ = 24;

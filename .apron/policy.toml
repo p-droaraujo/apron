@@ -1,0 +1,10 @@
+# O que um agente pode fazer neste repositório sem perguntar.
+[allow]
+commands = ["cmake", "ctest", "ninja", "git status", "git diff", "git add", "git commit", "./build/apron"]
+
+[ask]
+commands = ["git push", "rm -rf"]
+
+[protected]
+write = "ask"
+push  = "ask"

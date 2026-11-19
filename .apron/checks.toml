@@ -1,0 +1,8 @@
+# Cada check é um comando; código de saída 0 = passou.
+[[check]]
+name = "build"
+run  = "cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug >/dev/null && cmake --build build"
+
+[[check]]
+name = "test"
+run  = "ctest --test-dir build --output-on-failure"

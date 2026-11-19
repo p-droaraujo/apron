@@ -1,0 +1,40 @@
+// Resumo de uma execução a partir dos seus eventos: o que a interface mostra.
+#pragma once
+
+#include <cstdint>
+#include <string>
+#include <vector>
+
+#include "core/events.hpp"
+#include "core/project.hpp"
+
+namespace apron {
+
+// Estado de agente, na linguagem da interface (ver docs/agent-protocol.md).
+enum class RunState { Working, Waiting, Blocked, Done, Failed, Abandoned };
+
+std::string_view to_string(RunState state);
+
+struct RunSummary {
+  std::string id;
+  std::string task;
+  std::string agent;
+  std::string machine;
+  std::string intent;
+  int64_t started_ms = 0;
+  int64_t last_ms = 0;
+  RunState state = RunState::Working;
+  std::string last_msg;  // a frase mais recente
+  int steps = 0;
+  int checks_ok = 0;
+  int checks_failed = 0;
+};
+
+RunSummary summarize(const std::string& id, const std::vector<Event>& events);
+
+// Todas as execuções do projeto, mais recentes primeiro.
+std::vector<RunSummary> list_runs(const Project& project);
+
+std::string new_run_id(const std::string& task, int64_t now_ms);
+
+}  // namespace apron

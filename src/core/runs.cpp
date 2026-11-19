@@ -53,6 +53,7 @@ RunSummary summarize(const std::string& id, const std::vector<Event>& events) {
         else ++s.checks_failed;
         break;
       }
+      case Kind::Review: s.review = e.extra_str("action"); break;
       case Kind::RunFinished: {
         std::string result = e.extra_str("result");
         s.state = result == "failed" ? RunState::Failed

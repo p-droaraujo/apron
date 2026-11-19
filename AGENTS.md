@@ -4,7 +4,7 @@ This repository is managed by Apron, and Apron is built with itself. Follow the 
 
 ## Before you start
 
-1. Read `.apron/tasks.md` and pick a `[ ]` task whose dependencies are `[x]` (`./build/apron tasks --ready` lists them).
+1. Read `.apron/tasks.md` and pick a `[ ]` task whose dependencies are `[x]` (`./build/apron tasks --ready` lists them). If it has a `review` field, a person returned an earlier run: that comment comes first.
 2. Build the CLI: `cmake -S . -B build -G Ninja && cmake --build build`.
 3. Start the run: `./build/apron run start <id> --agent <your-name> --intent "<what you will do, in one sentence>"`.
 

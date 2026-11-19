@@ -81,34 +81,35 @@ void Terminal::write(const std::string& bytes) {
 KeyEvent Terminal::poll(int timeout_ms) {
   if (g_resized.exchange(false)) {
     query_size();
-    return {Key::Resize, 0};
+    return {Key::Resize, 0, ""};
   }
   pollfd pfd{STDIN_FILENO, POLLIN, 0};
   int r = ::poll(&pfd, 1, timeout_ms);
   if (g_resized.exchange(false)) {
     query_size();
-    return {Key::Resize, 0};
+    return {Key::Resize, 0, ""};
   }
   if (r <= 0) return {};
   char buf[16];
   ssize_t n = ::read(STDIN_FILENO, buf, sizeof buf);
   if (n <= 0) return {};
   if (buf[0] == '\x1b') {
-    if (n == 1) return {Key::Esc, 0};
+    if (n == 1) return {Key::Esc, 0, ""};
     if (n >= 3 && (buf[1] == '[' || buf[1] == 'O')) {
       switch (buf[2]) {
-        case 'A': return {Key::Up, 0};
-        case 'B': return {Key::Down, 0};
-        case 'C': return {Key::Right, 0};
-        case 'D': return {Key::Left, 0};
+        case 'A': return {Key::Up, 0, ""};
+        case 'B': return {Key::Down, 0, ""};
+        case 'C': return {Key::Right, 0, ""};
+        case 'D': return {Key::Left, 0, ""};
       }
     }
     return {};
   }
-  if (buf[0] == '\r' || buf[0] == '\n') return {Key::Enter, 0};
-  if (buf[0] == '\t') return {Key::Tab, 0};
-  if (buf[0] == 3) return {Key::Char, 'q'};  // Ctrl-C quits
-  return {Key::Char, buf[0]};
+  if (buf[0] == '\r' || buf[0] == '\n') return {Key::Enter, 0, ""};
+  if (buf[0] == '\t') return {Key::Tab, 0, ""};
+  if (buf[0] == 0x7f || buf[0] == 0x08) return {Key::Backspace, 0, ""};
+  if (buf[0] == 3) return {Key::Char, 'q', "q"};  // Ctrl-C quits
+  return {Key::Char, buf[0], std::string(buf, static_cast<size_t>(n))};
 }
 
 }  // namespace apron::tui

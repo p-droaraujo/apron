@@ -36,6 +36,7 @@ add_library(apron_core
   src/core/i18n.cpp
   src/core/checks.cpp
   src/core/scope.cpp
+  src/core/review.cpp
 )
 
 # The TUI: terminal, cell grid and the progress view.
@@ -69,12 +70,13 @@ add_executable(apron
   src/cli/cmd_sessions.cpp
   src/cli/cmd_projects.cpp
   src/cli/cmd_hook.cpp
+  src/cli/cmd_review.cpp
   src/cli/daemon_client.cpp
 )
 target_link_libraries(apron PRIVATE apron_tui apron_proto)
 
 enable_testing()
-add_executable(apron_tests tests/test_main.cpp tests/test_json.cpp tests/test_events.cpp tests/test_tasks.cpp tests/test_tui.cpp tests/test_i18n.cpp tests/test_checks.cpp tests/test_scope.cpp tests/test_daemon.cpp tests/test_cli.cpp tests/test_hooks.cpp)
+add_executable(apron_tests tests/test_main.cpp tests/test_json.cpp tests/test_events.cpp tests/test_tasks.cpp tests/test_tui.cpp tests/test_i18n.cpp tests/test_checks.cpp tests/test_scope.cpp tests/test_daemon.cpp tests/test_cli.cpp tests/test_hooks.cpp tests/test_review.cpp)
 target_link_libraries(apron_tests PRIVATE apron_tui apron_proto)
 add_dependencies(apron_tests aprond apron)
 target_compile_definitions(apron_tests PRIVATE APRON_SOURCE_DIR="${CMAKE_SOURCE_DIR}" APRON_BINARY_DIR="${CMAKE_BINARY_DIR}")

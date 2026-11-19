@@ -25,6 +25,7 @@ const std::unordered_map<std::string_view, std::string_view>& pt_br() {
       {"note", "nota"},
       {"check", "check"},
       {"finished", "terminou"},
+      {"review", "revisão"},
 
       // Progress view.
       {"PLAN", "PLANO"},
@@ -85,6 +86,28 @@ const std::unordered_map<std::string_view, std::string_view>& pt_br() {
       {"no runs yet", "nenhuma execução ainda"},
       {"warning: skipped line in {}", "aviso: linha ignorada em {}"},
       {"warning: {}", "aviso: {}"},
+      {"nothing to review", "nada para revisar"},
+      {"↑↓ move · enter open · esc back · q quit", "↑↓ navegar · enter abrir · esc voltar · q sair"},
+      {"outside", "fora"},
+      {"usage: apron review [<run> merge|return \"comment\"|discard]", "uso: apron review [<execução> merge|return \"comentário\"|discard]"},
+      {"the run has no commit with its Apron-Run trailer yet", "a execução ainda não tem um commit com o trailer Apron-Run"},
+      {"main has moved on since this run; rebase its branch onto main first", "o main andou desde esta execução; faça rebase do branch sobre o main antes"},
+      {"main has uncommitted changes; commit or stash them first", "o main tem mudanças não commitadas; faça commit ou stash antes"},
+      {"git could not fast-forward main", "o git não conseguiu avançar o main"},
+      {"returning a run needs a comment for the agent", "devolver uma execução precisa de um comentário para o agente"},
+      {"REVIEW", "REVISÃO"},
+      {"Progress", "Andamento"},
+      {"Review", "Revisão"},
+      {"Activity", "Atividade"},
+      {"waiting for review", "espera revisão"},
+      {"m merge · r return with a comment · d discard · esc back", "m mesclar · r devolver com comentário · d descartar · esc voltar"},
+      {"comment for the agent (enter sends, esc cancels): ", "comentário para o agente (enter envia, esc cancela): "},
+      {"merged", "mesclada"},
+      {"returned to the agent", "devolvida ao agente"},
+      {"discarded", "descartada"},
+      {"changes", "mudanças"},
+      {"trajectory", "trajetória"},
+      {"no commit yet: uncommitted changes since the run started", "ainda sem commit: mudanças não commitadas desde o início da execução"},
       {"aprond is not running; projects show up here once a run reports while it runs",
        "o aprond não está rodando; os projetos aparecem aqui quando uma execução reporta com ele no ar"},
       {"no projects yet", "nenhum projeto ainda"},
@@ -132,6 +155,8 @@ Runs (docs/agent-protocol.md):
   apron log [run]               timeline of a run (default: the current or the latest)
   apron check [names...]        run checks.toml and record the results in the current run
   apron scope [run]             files the run touched, and which left the task's scope
+  apron review                  finished runs waiting for a person
+  apron review <run> merge|return "comment"|discard
   apron runs                    every run in the project
   apron tasks [--ready]         the plan in tasks.md, with each task's state
 
@@ -159,6 +184,8 @@ Execuções (docs/agent-protocol.md):
   apron log [execução]          linha do tempo de uma execução (padrão: a atual ou a última)
   apron check [nomes...]        roda o checks.toml e grava os resultados na execução atual
   apron scope [execução]        arquivos que a execução tocou, e os que saíram do escopo
+  apron review                  execuções terminadas esperando uma pessoa
+  apron review <execução> merge|return "comentário"|discard
   apron runs                    todas as execuções do projeto
   apron tasks [--ready]         o plano do tasks.md, com o estado de cada tarefa
 

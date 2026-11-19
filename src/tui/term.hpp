@@ -5,11 +5,12 @@
 
 namespace apron::tui {
 
-enum class Key { None, Up, Down, Left, Right, Enter, Esc, Tab, Char, Resize };
+enum class Key { None, Up, Down, Left, Right, Enter, Esc, Tab, Backspace, Char, Resize };
 
 struct KeyEvent {
   Key key = Key::None;
   char ch = 0;
+  std::string text;  // the bytes typed, so accented letters survive in text input
 };
 
 class Terminal {

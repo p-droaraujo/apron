@@ -10,13 +10,14 @@ namespace apron {
 
 namespace {
 
-constexpr std::array<std::pair<std::string_view, std::string_view>, 6> kAliases{{
+constexpr std::array<std::pair<std::string_view, std::string_view>, 7> kAliases{{
     {"scope", "escopo"},
     {"done-when", "pronto"},
     {"depends", "depende"},
     {"checks", "checks"},
     {"decision", "decisão"},
     {"by", "por"},
+    {"review", "revisão"},
 }};
 
 std::string trim(std::string_view s) {

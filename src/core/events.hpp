@@ -12,7 +12,7 @@
 
 namespace apron {
 
-enum class Kind { RunStarted, Step, Ask, Blocked, Note, Check, RunFinished };
+enum class Kind { RunStarted, Step, Ask, Blocked, Note, Check, RunFinished, Review };
 
 std::string_view to_string(Kind kind);
 std::optional<Kind> kind_from_string(std::string_view text);

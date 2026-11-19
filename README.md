@@ -42,6 +42,10 @@ T2 · claude@nexus · 12m04s · ✓ feita
   12m04s  ■ terminou     done · parser and writer done; review the state markers first
 ```
 
+## Review
+
+Finished runs wait in Gates until you review them. `v` opens the Review tab: failing checks and scope drift first; Enter shows the trajectory, the checks, the scope and the changed files; `m` merges into `main`, `r` returns the run with a comment the next agent reads, `d` discards it. `apron review` does the same from the shell.
+
 ## Sessions that outlive your terminal
 
 `aprond` keeps terminal sessions alive on each machine; `apron` starts it on demand.

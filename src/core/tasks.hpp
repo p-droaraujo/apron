@@ -17,6 +17,7 @@ inline constexpr std::string_view kDepends = "depends";
 inline constexpr std::string_view kChecks = "checks";
 inline constexpr std::string_view kDecision = "decision";
 inline constexpr std::string_view kBy = "by";
+inline constexpr std::string_view kReview = "review";
 
 // "escopo" -> "scope"; an English or unknown key comes back unchanged.
 std::string_view canonical_key(std::string_view key);

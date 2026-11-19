@@ -13,7 +13,7 @@
 namespace apron {
 
 namespace {
-constexpr std::array<std::pair<Kind, std::string_view>, 7> kKinds{{
+constexpr std::array<std::pair<Kind, std::string_view>, 8> kKinds{{
     {Kind::RunStarted, "run.started"},
     {Kind::Step, "step"},
     {Kind::Ask, "ask"},
@@ -21,6 +21,7 @@ constexpr std::array<std::pair<Kind, std::string_view>, 7> kKinds{{
     {Kind::Note, "note"},
     {Kind::Check, "check"},
     {Kind::RunFinished, "run.finished"},
+    {Kind::Review, "review"},
 }};
 }
 

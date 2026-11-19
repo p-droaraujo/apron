@@ -84,7 +84,7 @@ Apron's own plan, in the format described in `docs/agent-protocol.md`.
 
 ## v0b · Review
 
-- [ ] T14 Review tab: finished runs with trajectory, checks, scope and the diff, and the actions merge, return to the agent, discard
+- [x] T14 Review tab: finished runs with trajectory, checks, scope and the diff, and the actions merge, return to the agent, discard
   scope: CMakeLists.txt, src/tui/**, src/cli/**, src/core/**, tests/**, README.md
   depends: T11, T4
   done-when: `v` in the TUI opens a queue of finished runs, failing checks and scope drift first; Enter shows the instruments and the changed files; m merges the run's branch into main, r writes the person's comment as the run's next prompt note, d discards

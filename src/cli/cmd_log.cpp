@@ -68,6 +68,13 @@ void print_event(const Style& st, const Event& e, int64_t start) {
         msg += st.dim(" " + timeutil::short_duration(static_cast<int64_t>(ms->num())));
       break;
     }
+    case Kind::Review: {
+      std::string action = e.extra_str("action");
+      glyph = action == "merged" ? "✓" : action == "returned" ? st.amber("↩") : st.dim("–");
+      text = tr("review");
+      msg = tr(action == "returned" ? "returned to the agent" : action) + (e.msg.empty() ? "" : " · " + e.msg);
+      break;
+    }
     case Kind::RunFinished: {
       std::string result = e.extra_str("result");
       glyph = result == "failed" ? st.red("■") : "■";

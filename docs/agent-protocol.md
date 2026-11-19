@@ -52,6 +52,7 @@ Fields:
 | `checks` | `checks` | no | Check names; without the field, all checks run |
 | `decision` | `decisão` | no | Why this task needs a person (turns into ◐ when it ends) |
 | `by` | `por` | no | Written by Apron when someone picks the task up |
+| `review` | `revisão` | no | Written by Apron when a person returns a run: what the next agent must change |
 
 Both spellings are read the same way. When Apron writes a field, it uses the language the task is already written in, so a file never mixes the two.
 
@@ -69,6 +70,8 @@ apron check                             →  runs the checks, one check event pe
 apron run finish --result done "..."    →  [x], summary, goes to Review
 git commit (with Apron-Run: <id>)       →  tasks.md and code change together
 ```
+
+Then a person reviews the run (the Review tab, or `apron review`): **merge** fast-forwards `main` to the run's commit and never merges over a `main` that moved on; **return** reopens the task with the person's comment in its `review` field; **discard** reopens the task and deletes nothing.
 
 The commit comes after `finish`, because `finish` changes the state in `tasks.md`. The `Apron-Run` trailer links the commit to the run, and the commit body carries the summary: events stay out of git, but the story of the work survives the push.
 
@@ -94,7 +97,8 @@ One JSON line per event in `.apron/runs/<run>.jsonl`:
 | `blocked` | Something outside stops progress | `cause` (gpu, budget, lock, machine, other) | ⊘ with the cause |
 | `note` | Something the next run should know | — | A line in the session log |
 | `check` | A check ran | `name`, `ok`, `ms` | The checks instrument |
-| `run.finished` | On finishing | `result` (done, failed, abandoned) | The card moves to Gates or Review |
+| `run.finished` | On finishing | `result` (done, failed, abandoned) | The card waits in Gates for review |
+| `review` | A person reviewed the run | `action` (merged, returned, discarded) | The card leaves Gates |
 
 Writing rules for the agent:
 

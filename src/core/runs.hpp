@@ -30,6 +30,8 @@ struct RunSummary {
   int checks_ok = 0;
   int checks_failed = 0;
   int files = -1;  // -1 = not measured
+  std::string review;  // "", or merged, returned, discarded
+  bool needs_review() const { return review.empty() && (state == RunState::Done || state == RunState::Failed); }
   std::vector<std::string> outside;
 };
 

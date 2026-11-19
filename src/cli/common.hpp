@@ -61,6 +61,7 @@ int cmd_scope(const Args& args);
 int cmd_sessions(const std::string& cmd, const Args& args);
 int cmd_projects(const Args& args);
 int cmd_hook(const Args& args);
+int cmd_review(const Args& args);
 
 // Files a run touched since its base commit, checked against the task's scope.
 ScopeReport measure_scope(const Project& project, const std::vector<Event>& events);

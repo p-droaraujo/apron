@@ -73,6 +73,6 @@ TEST("cli: a run reported while aprond runs shows up in apron projects, linked t
   std::ifstream reg(dir / "state" / "apron" / "projects");
   std::string line;
   std::getline(reg, line);
-  CHECK_EQ(line, (dir / "demo").string());
+  CHECK_EQ(line, fs::canonical(dir / "demo").string());  // /var is /private/var on macOS
   fs::remove_all(dir);
 }

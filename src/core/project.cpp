@@ -10,8 +10,10 @@ namespace apron {
 namespace fs = std::filesystem;
 
 std::optional<Project> find_project(fs::path start) {
+  // The real path, with symlinks resolved: on macOS /var is /private/var, and
+  // one project must not show up under two names.
   std::error_code ec;
-  fs::path dir = fs::absolute(start, ec);
+  fs::path dir = fs::weakly_canonical(fs::absolute(start, ec), ec);
   if (ec) return std::nullopt;
   while (true) {
     if (fs::is_directory(dir / ".apron", ec)) return Project{dir};

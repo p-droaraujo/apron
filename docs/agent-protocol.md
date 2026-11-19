@@ -109,7 +109,7 @@ Writing rules for the agent:
 
 | Agent | How state arrives | How events arrive |
 | --- | --- | --- |
-| Claude Code | Hooks (UserPromptSubmit, Notification, Stop, PreToolUse) call `apron report` | The agent calls `apron report` from the shell, guided by `AGENTS.md`; in v0b also over MCP |
+| Claude Code | Hooks call `apron hook` (PreToolUse, PostToolUse, Notification, UserPromptSubmit, Stop, SessionEnd); see `integrations/claude-code/` | The agent calls `apron report` from the shell, guided by `AGENTS.md`; the hooks fill the gaps |
 | Codex | `notify` calls `apron report` | Shell, guided by `AGENTS.md` |
 | Pi | Its own extension | Extension and shell |
 | Others | Foreground process | Shell, if the agent reads `AGENTS.md` |

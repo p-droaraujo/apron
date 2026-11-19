@@ -54,6 +54,10 @@ T2 · claude@nexus · 12m04s · ✓ feita
 ./build/apron projects              # every project on this machine, with its runs
 ```
 
+## Claude Code reports by itself
+
+With the hooks in [`integrations/claude-code/`](integrations/claude-code/) (already on in this repository), Claude Code tells Apron when it reads, edits, builds or tests, when it waits for you, and it closes its run before ending its turn.
+
 ## How it fits together
 
 - `aprond` — a daemon on each machine that owns terminals and agents.

@@ -109,6 +109,7 @@ int main(int argc, char** argv) {
   if (cmd == "log") return cmd_log(Args::parse(argc, argv, 2));
   if (cmd == "new" || cmd == "ls" || cmd == "attach" || cmd == "kill" || cmd == "daemon")
     return cmd_sessions(cmd, Args::parse(argc, argv, 2, {"d", "detach"}));
+  if (cmd == "hook") return cmd_hook(Args::parse(argc, argv, 2));
   if (cmd == "projects") return cmd_projects(Args::parse(argc, argv, 2));
   if (cmd == "scope") return cmd_scope(Args::parse(argc, argv, 2));
   if (cmd == "check") return cmd_check(Args::parse(argc, argv, 2));

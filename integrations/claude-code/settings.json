@@ -6,6 +6,9 @@
     "PreToolUse": [
       { "matcher": "*", "hooks": [{ "type": "command", "command": "\"$CLAUDE_PROJECT_DIR\"/integrations/claude-code/apron-hook.sh" }] }
     ],
+    "PostToolUse": [
+      { "matcher": "*", "hooks": [{ "type": "command", "command": "\"$CLAUDE_PROJECT_DIR\"/integrations/claude-code/apron-hook.sh" }] }
+    ],
     "Notification": [
       { "hooks": [{ "type": "command", "command": "\"$CLAUDE_PROJECT_DIR\"/integrations/claude-code/apron-hook.sh" }] }
     ],

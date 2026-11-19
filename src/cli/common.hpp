@@ -11,7 +11,9 @@
 #include <vector>
 
 #include "core/i18n.hpp"
+#include "core/events.hpp"
 #include "core/project.hpp"
+#include "core/scope.hpp"
 
 namespace apron::cli {
 
@@ -55,6 +57,10 @@ int cmd_runs(const Args& args);
 int cmd_tasks(const Args& args);
 int cmd_ui(const Args& args);
 int cmd_check(const Args& args);
+int cmd_scope(const Args& args);
+
+// Files a run touched since its base commit, checked against the task's scope.
+ScopeReport measure_scope(const Project& project, const std::vector<Event>& events);
 
 // Updates a task's state in tasks.md; false if the task is not there.
 bool sync_task(const Project& project, const std::string& id, char state, const std::string& by);

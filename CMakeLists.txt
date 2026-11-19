@@ -20,6 +20,7 @@ add_library(apron_core
   src/core/tasks.cpp
   src/core/i18n.cpp
   src/core/checks.cpp
+  src/core/scope.cpp
 )
 
 # The TUI: terminal, cell grid and the progress view.
@@ -39,11 +40,12 @@ add_executable(apron
   src/cli/cmd_tasks.cpp
   src/cli/cmd_ui.cpp
   src/cli/cmd_check.cpp
+  src/cli/cmd_scope.cpp
 )
 target_link_libraries(apron PRIVATE apron_tui)
 
 enable_testing()
-add_executable(apron_tests tests/test_main.cpp tests/test_json.cpp tests/test_events.cpp tests/test_tasks.cpp tests/test_tui.cpp tests/test_i18n.cpp tests/test_checks.cpp)
+add_executable(apron_tests tests/test_main.cpp tests/test_json.cpp tests/test_events.cpp tests/test_tasks.cpp tests/test_tui.cpp tests/test_i18n.cpp tests/test_checks.cpp tests/test_scope.cpp)
 target_link_libraries(apron_tests PRIVATE apron_tui)
 target_compile_definitions(apron_tests PRIVATE APRON_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
 add_test(NAME core COMMAND apron_tests)

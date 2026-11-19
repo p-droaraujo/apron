@@ -68,6 +68,7 @@ Runs (docs/agent-protocol.md):
   apron report blocked --cause gpu|budget|lock|machine|other "sentence"
   apron log [run]               timeline of a run (default: the current or the latest)
   apron check [names...]        run checks.toml and record the results in the current run
+  apron scope [run]             files the run touched, and which left the task's scope
   apron runs                    every run in the project
   apron tasks [--ready]         the plan in tasks.md, with each task's state
 
@@ -88,6 +89,7 @@ int main(int argc, char** argv) {
   if (cmd == "run") return cmd_run(Args::parse(argc, argv, 2, {"force"}));
   if (cmd == "report") return cmd_report(Args::parse(argc, argv, 2));
   if (cmd == "log") return cmd_log(Args::parse(argc, argv, 2));
+  if (cmd == "scope") return cmd_scope(Args::parse(argc, argv, 2));
   if (cmd == "check") return cmd_check(Args::parse(argc, argv, 2));
   if (cmd == "runs") return cmd_runs(Args::parse(argc, argv, 2));
   if (cmd == "tasks") return cmd_tasks(Args::parse(argc, argv, 2, {"ready", "prontas"}));

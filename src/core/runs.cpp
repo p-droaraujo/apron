@@ -58,6 +58,10 @@ RunSummary summarize(const std::string& id, const std::vector<Event>& events) {
         s.state = result == "failed" ? RunState::Failed
                   : result == "abandoned" ? RunState::Abandoned
                                           : RunState::Done;
+        if (const json::Value* f = e.extra_find("files"); f && f->is_array()) s.files = static_cast<int>(f->arr().size());
+        if (const json::Value* o = e.extra_find("outside"); o && o->is_array())
+          for (const auto& v : o->arr())
+            if (v.is_string()) s.outside.push_back(v.str());
         break;
       }
     }

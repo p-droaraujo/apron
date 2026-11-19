@@ -29,6 +29,8 @@ struct RunSummary {
   int steps = 0;
   int checks_ok = 0;
   int checks_failed = 0;
+  int files = -1;  // -1 = not measured
+  std::vector<std::string> outside;
 };
 
 RunSummary summarize(const std::string& id, const std::vector<Event>& events);

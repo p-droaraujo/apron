@@ -105,6 +105,11 @@ int cmd_log(const Args& args) {
               state_label(st, s.state).c_str());
   std::printf("%s\n\n", st.dim(run).c_str());
   for (const auto& e : events) print_event(st, e, s.started_ms);
+  if (s.files >= 0) {
+    std::string line = trf("scope: {} files, {} outside", {std::to_string(s.files), std::to_string(s.outside.size())});
+    std::printf("\n  %s\n", s.outside.empty() ? st.dim(line).c_str() : st.amber(line).c_str());
+    for (const auto& f : s.outside) std::printf("    %s %s\n", st.amber("✕").c_str(), f.c_str());
+  }
   for (const auto& w : warnings) std::fprintf(stderr, "%s\n", trf("warning: skipped line in {}", {w}).c_str());
   return 0;
 }
@@ -123,6 +128,7 @@ int cmd_runs(const Args&) {
     std::string checks;
     if (s.checks_ok + s.checks_failed > 0)
       checks = "checks " + std::to_string(s.checks_ok) + "/" + std::to_string(s.checks_ok + s.checks_failed);
+    if (!s.outside.empty()) checks += (checks.empty() ? "" : " ") + st.amber("✕" + std::to_string(s.outside.size()));
     std::printf("%s %s %s %s %s %s\n", pad(state_label(st, s.state), 18).c_str(), pad(s.task, 5).c_str(),
                 pad(s.agent + "@" + s.machine, 18).c_str(),
                 st.dim(pad(timeutil::short_duration(s.last_ms - s.started_ms), 7)).c_str(), pad(checks, 11).c_str(),

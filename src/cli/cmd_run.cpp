@@ -4,6 +4,7 @@
 #include "cli/common.hpp"
 #include "core/events.hpp"
 #include "core/runs.hpp"
+#include "core/scope.hpp"
 #include "core/tasks.hpp"
 #include "core/time.hpp"
 
@@ -42,6 +43,8 @@ int run_start(const Args& args, const Project& project) {
   e.kind = Kind::RunStarted;
   std::string intent = args.get("intent", args.rest(2));
   if (!intent.empty()) e.extra.emplace_back("intent", intent);
+  // The commit the run starts from: the scope meter diffs against it.
+  if (auto head = git_head(project.root)) e.extra.emplace_back("base", *head);
 
   std::string err;
   if (!append_event(project.run_file(e.run), e, &err)) return fail(err);
@@ -50,6 +53,25 @@ int run_start(const Args& args, const Project& project) {
   std::printf("%s\n", e.run.c_str());
   return 0;
 }
+
+}  // namespace
+
+ScopeReport measure_scope(const Project& project, const std::vector<Event>& events) {
+  if (events.empty()) return {};
+  const Event& first = events.front();
+  std::string base = first.extra_str("base");
+  if (base.empty()) {
+    // Runs started before the meter existed: use the commit HEAD had at the start.
+    if (auto at = git_commit_at(project.root, first.ts_ms)) base = *at;
+  }
+  if (base.empty()) return {};
+  std::vector<std::string> scope = {"**"};
+  if (auto file = TaskFile::load(project.tasks_file()))
+    if (const Task* t = file->find(first.task)) scope = split_scope(t->field(kScope));
+  return check_scope(git_changed_files(project.root, base), scope);
+}
+
+namespace {
 
 int run_finish(const Args& args, const Project& project) {
   std::string run = args.get("run");
@@ -74,6 +96,18 @@ int run_finish(const Args& args, const Project& project) {
   e.kind = Kind::RunFinished;
   e.msg = args.rest(1);
   e.extra.emplace_back("result", result);
+
+  // Scope meter: what this run touched, and what left the task's scope.
+  ScopeReport scope = measure_scope(project, events);
+  json::Array files, outside;
+  for (const auto& f : scope.files) files.emplace_back(f);
+  for (const auto& f : scope.outside) outside.emplace_back(f);
+  e.extra.emplace_back("files", std::move(files));
+  e.extra.emplace_back("outside", std::move(outside));
+  if (!scope.outside.empty()) {
+    std::fprintf(stderr, "%s\n", trf("warning: {} of {} files left the scope:", {std::to_string(scope.outside.size()), std::to_string(scope.files.size())}).c_str());
+    for (const auto& f : scope.outside) std::fprintf(stderr, "  %s\n", f.c_str());
+  }
   std::string err;
   if (!append_event(project.run_file(run), e, &err)) return fail(err);
   if (project.current_run() == run) project.clear_current_run();

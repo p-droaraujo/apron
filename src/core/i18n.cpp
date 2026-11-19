@@ -85,6 +85,10 @@ const std::unordered_map<std::string_view, std::string_view>& pt_br() {
       {"no runs yet", "nenhuma execução ainda"},
       {"warning: skipped line in {}", "aviso: linha ignorada em {}"},
       {"warning: {}", "aviso: {}"},
+      {"warning: {} of {} files left the scope:", "aviso: {} de {} arquivos saíram do escopo:"},
+      {"no run in progress; use apron scope <run>", "nenhuma execução em curso; use apron scope <execução>"},
+      {"{} files, {} outside the scope", "{} arquivos, {} fora do escopo"},
+      {"scope: {} files, {} outside", "escopo: {} arquivos, {} fora"},
       {"checks.toml has no [[check]] with name and run", "o checks.toml não tem nenhum [[check]] com name e run"},
       {"warning: no check named {} in checks.toml", "aviso: nenhum check chamado {} no checks.toml"},
       {"timed out after {}s", "estourou o tempo de {}s"},
@@ -103,6 +107,7 @@ Runs (docs/agent-protocol.md):
   apron report blocked --cause gpu|budget|lock|machine|other "sentence"
   apron log [run]               timeline of a run (default: the current or the latest)
   apron check [names...]        run checks.toml and record the results in the current run
+  apron scope [run]             files the run touched, and which left the task's scope
   apron runs                    every run in the project
   apron tasks [--ready]         the plan in tasks.md, with each task's state
 
@@ -121,6 +126,7 @@ Execuções (docs/agent-protocol.md):
   apron report blocked --cause gpu|budget|lock|machine|other "frase"
   apron log [execução]          linha do tempo de uma execução (padrão: a atual ou a última)
   apron check [nomes...]        roda o checks.toml e grava os resultados na execução atual
+  apron scope [execução]        arquivos que a execução tocou, e os que saíram do escopo
   apron runs                    todas as execuções do projeto
   apron tasks [--ready]         o plano do tasks.md, com o estado de cada tarefa
 

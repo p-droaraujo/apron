@@ -261,6 +261,13 @@ void render_log(Screen& sc, const Project& project, const std::string& run, int 
     sc.put(11, y, what, ls);
     sc.put(24, y, fit(msg, W - 25), ms);
   }
+  if (s.files >= 0 && y + 1 < H - 1) {
+    ++y;
+    std::string line = trf("scope: {} files, {} outside", {std::to_string(s.files), std::to_string(s.outside.size())});
+    sc.put(1, y++, line, s.outside.empty() ? kDim : kAmber);
+    for (const auto& f : s.outside)
+      if (y < H - 1) sc.put(3, y++, "✕ " + f, kAmber);
+  }
   sc.put(0, H - 1, " APRON ", kBadge);
   std::string back = tr("↑↓ scroll · esc back");
   sc.put(W - text_width(back) - 1, H - 1, back, kDim);

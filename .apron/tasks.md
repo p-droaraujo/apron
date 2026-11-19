@@ -33,7 +33,7 @@ Apron's own plan, in the format described in `docs/agent-protocol.md`.
   done-when: `apron check` shows each check with ok and duration and records them in the current run
   checks: build, test
 
-- [ ] T4 Scope meter: files changed in git compared with the task's globs
+- [x] T4 Scope meter: files changed in git compared with the task's globs
   scope: src/**, tests/**
   depends: T2
   done-when: `apron run finish` records the touched files and the ones that left the scope

@@ -92,7 +92,7 @@ class Parser {
   std::optional<Value> run(std::string* error) {
     auto value = parse_value();
     skip_ws();
-    if (value && pos_ != s_.size()) fail("texto sobrando depois do valor");
+    if (value && pos_ != s_.size()) fail("trailing text after the value");
     if (!error_.empty()) {
       if (error) *error = error_;
       return std::nullopt;
@@ -107,7 +107,7 @@ class Parser {
   int depth_ = 0;
 
   void fail(const char* msg) {
-    if (error_.empty()) error_ = std::string(msg) + " na posição " + std::to_string(pos_);
+    if (error_.empty()) error_ = std::string(msg) + " at position " + std::to_string(pos_);
   }
   void skip_ws() {
     while (pos_ < s_.size() && (s_[pos_] == ' ' || s_[pos_] == '\n' || s_[pos_] == '\r' || s_[pos_] == '\t')) ++pos_;
@@ -131,11 +131,11 @@ class Parser {
   std::optional<Value> parse_value() {
     skip_ws();
     if (pos_ >= s_.size()) {
-      fail("fim inesperado");
+      fail("unexpected end");
       return std::nullopt;
     }
     if (++depth_ > 64) {
-      fail("aninhamento profundo demais");
+      fail("nesting too deep");
       return std::nullopt;
     }
     std::optional<Value> out;
@@ -159,12 +159,12 @@ class Parser {
     while (pos_ < s_.size() && (std::isdigit(static_cast<unsigned char>(s_[pos_])) || s_[pos_] == '.' ||
                                 s_[pos_] == 'e' || s_[pos_] == 'E' || s_[pos_] == '-' || s_[pos_] == '+'))
       ++pos_;
-    // strtod em vez de from_chars: libc++ antigas (macOS) não têm from_chars para double.
+    // strtod instead of from_chars: older libc++ (macOS) lacks from_chars for double.
     std::string token(s_.substr(start, pos_ - start));
     char* end = nullptr;
     double d = std::strtod(token.c_str(), &end);
     if (start == pos_ || end != token.c_str() + token.size()) {
-      fail("número inválido");
+      fail("invalid number");
       return std::nullopt;
     }
     return Value(d);
@@ -197,7 +197,7 @@ class Parser {
   }
 
   std::optional<std::string> parse_string() {
-    ++pos_;  // aspas de abertura
+    ++pos_;  // opening quote
     std::string out;
     while (pos_ < s_.size()) {
       char c = s_[pos_++];
@@ -220,7 +220,7 @@ class Parser {
         case 'u': {
           auto cp = hex4();
           if (!cp) {
-            fail("escape \\u inválido");
+            fail("invalid \\u escape");
             return std::nullopt;
           }
           if (*cp >= 0xD800 && *cp <= 0xDBFF && literal("\\u")) {
@@ -231,11 +231,11 @@ class Parser {
           break;
         }
         default:
-          fail("escape inválido");
+          fail("invalid escape");
           return std::nullopt;
       }
     }
-    fail("texto sem aspas de fechamento");
+    fail("unterminated string");
     return std::nullopt;
   }
 
@@ -249,7 +249,7 @@ class Parser {
       out.push_back(std::move(*item));
       if (consume(',')) continue;
       if (consume(']')) return Value(std::move(out));
-      fail("esperava , ou ]");
+      fail("expected , or ]");
       return std::nullopt;
     }
   }
@@ -261,13 +261,13 @@ class Parser {
     while (true) {
       skip_ws();
       if (pos_ >= s_.size() || s_[pos_] != '"') {
-        fail("esperava uma chave entre aspas");
+        fail("expected a quoted key");
         return std::nullopt;
       }
       auto key = parse_string();
       if (!key) return std::nullopt;
       if (!consume(':')) {
-        fail("esperava :");
+        fail("expected :");
         return std::nullopt;
       }
       auto item = parse_value();
@@ -275,7 +275,7 @@ class Parser {
       out.emplace_back(std::move(*key), std::move(*item));
       if (consume(',')) continue;
       if (consume('}')) return Value(std::move(out));
-      fail("esperava , ou }");
+      fail("expected , or }");
       return std::nullopt;
     }
   }

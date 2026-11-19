@@ -1,4 +1,4 @@
-// apron tasks, e a ponte entre execuções e o tasks.md.
+// apron tasks, and the bridge between runs and tasks.md.
 #include <cstdio>
 
 #include "cli/common.hpp"
@@ -20,14 +20,14 @@ std::string glyph(const Style& st, char state, bool ready) {
 
 }  // namespace
 
-bool sync_task(const Project& project, const std::string& id, char state, const std::string& por) {
+bool sync_task(const Project& project, const std::string& id, char state, const std::string& by) {
   std::string err;
   auto file = TaskFile::load(project.tasks_file(), &err);
   if (!file || !file->find(id)) return false;
   file->set_state(id, state);
-  file->set_field(id, "por", state == '~' || state == '?' ? por : "");
+  file->set_field(id, kBy, state == '~' || state == '?' ? by : "");
   if (!file->save(project.tasks_file(), &err)) {
-    std::fprintf(stderr, "aviso: %s\n", err.c_str());
+    std::fprintf(stderr, "%s\n", trf("warning: {}", {err}).c_str());
     return false;
   }
   return true;
@@ -40,7 +40,7 @@ int cmd_tasks(const Args& args) {
   auto file = TaskFile::load(project->tasks_file(), &err);
   if (!file) return fail(err);
   Style st;
-  bool only_ready = args.has("prontas");
+  bool only_ready = args.has("ready") || args.has("prontas");
   std::string section;
   for (const auto& t : file->tasks()) {
     bool ready = t.state == ' ' && blockers_to_start(*file, t).empty();
@@ -49,7 +49,7 @@ int cmd_tasks(const Args& args) {
       section = t.section;
       std::printf("%s%s\n", section.empty() ? "" : "\n", st.dim(section).c_str());
     }
-    std::string who = t.field("por");
+    std::string who = t.field(kBy);
     std::string deps;
     if (t.state == ' ' && !ready && !t.depends().empty()) {
       for (const auto& d : t.depends()) deps += (deps.empty() ? "" : ", ") + d;

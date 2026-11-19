@@ -3,7 +3,7 @@
 
 using namespace apron;
 
-TEST("json: ida e volta preserva ordem e tipos") {
+TEST("json: round trip keeps order and types") {
   json::Object o;
   o.emplace_back("b", 1);
   o.emplace_back("a", "texto com \"aspas\" e \\barra\n");
@@ -16,14 +16,14 @@ TEST("json: ida e volta preserva ordem e tipos") {
   CHECK_EQ(json::dump(*back), text);
 }
 
-TEST("json: acentos e escapes unicode") {
+TEST("json: accents and unicode escapes") {
   auto v = json::parse(R"({"msg":"decis\u00e3o ◐","emoji":"\ud83d\ude80"})");
   CHECK(v.has_value());
   CHECK_EQ(v->get_str("msg"), std::string("decisão ◐"));
   CHECK_EQ(v->get_str("emoji"), std::string("\xF0\x9F\x9A\x80"));
 }
 
-TEST("json: entradas inválidas são recusadas com mensagem") {
+TEST("json: invalid input is rejected with a message") {
   std::string err;
   CHECK(!json::parse("{\"a\":", &err));
   CHECK(!err.empty());

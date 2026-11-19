@@ -1,4 +1,4 @@
-// Resumo de uma execução a partir dos seus eventos: o que a interface mostra.
+// A run summarized from its events: what the interface shows.
 #pragma once
 
 #include <cstdint>
@@ -10,10 +10,11 @@
 
 namespace apron {
 
-// Estado de agente, na linguagem da interface (ver docs/agent-protocol.md).
+// Agent state, in the interface's vocabulary (see docs/agent-protocol.md).
 enum class RunState { Working, Waiting, Blocked, Done, Failed, Abandoned };
 
-std::string_view to_string(RunState state);
+std::string_view to_string(RunState state);  // English, stable
+std::string label(RunState state);           // translated, for display
 
 struct RunSummary {
   std::string id;
@@ -24,7 +25,7 @@ struct RunSummary {
   int64_t started_ms = 0;
   int64_t last_ms = 0;
   RunState state = RunState::Working;
-  std::string last_msg;  // a frase mais recente
+  std::string last_msg;  // the most recent sentence
   int steps = 0;
   int checks_ok = 0;
   int checks_failed = 0;
@@ -32,7 +33,7 @@ struct RunSummary {
 
 RunSummary summarize(const std::string& id, const std::vector<Event>& events);
 
-// Todas as execuções do projeto, mais recentes primeiro.
+// Every run in the project, newest first.
 std::vector<RunSummary> list_runs(const Project& project);
 
 std::string new_run_id(const std::string& task, int64_t now_ms);

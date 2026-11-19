@@ -1,118 +1,125 @@
-# Protocolo do agente
+# Agent protocol
 
-Como um agente de IA trabalha num projeto do Apron, do começo ao fim, e como ele conta o que está fazendo.
+How an AI agent works on an Apron project from start to finish, and how it tells what it is doing.
 
-O princípio: **o agente narra o trabalho em eventos curtos e estruturados; o Apron transforma esses eventos em andamento, custo, escopo e revisão.** O agente nunca precisa explicar o que o Apron já consegue medir sozinho, como arquivos alterados, tempo ou tokens.
+The principle: **the agent narrates its work in short, structured events; Apron turns those events into progress, cost, scope and review.** The agent never explains what Apron can measure on its own, such as changed files, time or tokens.
 
-## 1. O projeto
+## 1. The project
 
-Um projeto do Apron é um repositório git com uma pasta `.apron/`:
+An Apron project is a git repository with an `.apron/` folder:
 
-| Arquivo | Versionado | Para quê |
+| File | Versioned | What for |
 | --- | --- | --- |
-| `.apron/project.toml` | sim | Nome, modo (manual ou auto), caminhos de decisão |
-| `.apron/tasks.md` | sim | O plano: tarefas, escopo, dependências, critério de pronto |
-| `.apron/checks.toml` | sim | Comandos que dizem se o trabalho está bom |
-| `.apron/policy.toml` | sim | O que o agente pode fazer sem perguntar |
-| `.apron/runs/` | não | Eventos de cada execução, um arquivo por execução |
+| `.apron/project.toml` | yes | Name, language, mode (manual or auto), decision paths |
+| `.apron/tasks.md` | yes | The plan: tasks, scope, dependencies, done-when |
+| `.apron/checks.toml` | yes | Commands that tell whether the work is good |
+| `.apron/policy.toml` | yes | What an agent may do without asking |
+| `.apron/runs/` | no | Events of each run, one file per run |
 
-Tudo que é do projeto vive no repositório e muda por commit. Os eventos das execuções são da máquina e não entram no git.
+Everything that belongs to the project lives in the repository and changes by commit. Run events belong to the machine and stay out of git.
 
-## 2. O formato do `tasks.md`
+## 2. The `tasks.md` format
 
-Markdown legível por gente e por máquina. Uma tarefa é um item de lista com um id estável, seguido de campos indentados `chave: valor`.
+Markdown that both people and machines read. A task is a list item with a stable id, followed by indented `key: value` fields.
 
 ```markdown
-## v0a · Observar
+## v0a · Observe
 
-- [ ] T2 Daemon mínimo guarda sessões e responde a sessions.list
-  escopo: src/daemon/**, tests/daemon/**
-  depende: T1
-  pronto: `aprond` sobe, cria um PTY com `apron new` e `apron ls` o mostra
+- [ ] T6 Minimal daemon keeps sessions and answers sessions.list
+  scope: src/daemon/**, tests/daemon/**
+  depends: T1
+  done-when: `aprond` starts, `apron new` creates a PTY and `apron ls` lists it
   checks: build, test
 ```
 
-O que vai entre colchetes é o estado:
+The mark between brackets is the state:
 
-| Marca | Estado | Quem muda |
+| Mark | State | Who changes it |
 | --- | --- | --- |
-| `[ ]` | Aberta | Pessoa ou Planner |
-| `[~]` | Em andamento, com `por: <agente>@<máquina>` | `apron run start` |
-| `[?]` | Espera uma decisão da pessoa | `apron report ask` |
-| `[x]` | Feita | `apron run finish --result done` |
-| `[-]` | Abandonada | Pessoa |
+| `[ ]` | Open | A person or the Planner |
+| `[~]` | In progress, with `by: <agent>@<machine>` | `apron run start` |
+| `[?]` | Waiting for a decision from a person | `apron report ask` |
+| `[x]` | Done | `apron run finish --result done` |
+| `[-]` | Abandoned | A person |
 
-Campos:
+Fields:
 
-| Campo | Obrigatório | Significado |
-| --- | --- | --- |
-| `escopo` | sim | Globs dos arquivos que a tarefa pode tocar; o que sair disso vira desvio de escopo |
-| `pronto` | sim | O critério verificável de pronto, em uma frase |
-| `depende` | não | Ids que precisam estar feitos antes |
-| `checks` | não | Nomes de checks; sem o campo, rodam todos |
-| `decisão` | não | Por que esta tarefa precisa de uma pessoa (vira ◐ ao terminar) |
-| `por` | não | Escrito pelo Apron quando alguém pega a tarefa |
+| Field | Portuguese alias | Required | Meaning |
+| --- | --- | --- | --- |
+| `scope` | `escopo` | yes | Globs of the files the task may touch; anything outside is scope drift |
+| `done-when` | `pronto` | yes | The verifiable criterion for done, in one sentence |
+| `depends` | `depende` | no | Ids that must be done first |
+| `checks` | `checks` | no | Check names; without the field, all checks run |
+| `decision` | `decisão` | no | Why this task needs a person (turns into ◐ when it ends) |
+| `by` | `por` | no | Written by Apron when someone picks the task up |
 
-Uma tarefa sem `escopo` ou sem `pronto` não pode ser pega: o Apron recusa o `run start` e diz o que falta. Esse é o contrato mínimo para o trabalho ser revisável.
+Both spellings are read the same way. When Apron writes a field, it uses the language the task is already written in, so a file never mixes the two.
 
-## 3. O ciclo de uma execução
+A task without `scope` or `done-when` cannot be picked up: Apron refuses `run start` and says what is missing. That is the minimum contract for work to be reviewable.
+
+## 3. The life of a run
 
 ```
-apron run start T2 --intent "..."      →  [~] no tasks.md, worktree, evento run.started
-apron report step "..."                 →  trajetória
-apron report ask "..."                  →  ◐ espera por você; [?] no tasks.md
-apron report blocked "..."              →  ⊘ sem energia, com a causa
-apron report note "..."                 →  aprendizado que vale para a próxima execução
-apron check                             →  roda os checks, um evento check por comando
-apron run finish --result done "..."    →  [x], resumo, entra na Revisão
-git commit (com Apron-Run: <id>)        →  o tasks.md e o código mudam juntos
+apron run start T6 --intent "..."      →  [~] in tasks.md, worktree, run.started event
+apron report step "..."                 →  trajectory
+apron report ask "..."                  →  ◐ waiting for you; [?] in tasks.md
+apron report blocked "..."              →  ⊘ no power, with the cause
+apron report note "..."                 →  a lesson the next run should know
+apron check                             →  runs the checks, one check event per command
+apron run finish --result done "..."    →  [x], summary, goes to Review
+git commit (with Apron-Run: <id>)       →  tasks.md and code change together
 ```
 
-O commit vem depois do `finish`, porque o `finish` muda o estado no `tasks.md`. O trailer `Apron-Run` liga o commit à execução, e o corpo do commit leva o resumo: os eventos ficam fora do git, mas a história do trabalho não se perde no push.
+The commit comes after `finish`, because `finish` changes the state in `tasks.md`. The `Apron-Run` trailer links the commit to the run, and the commit body carries the summary: events stay out of git, but the story of the work survives the push.
 
-Cada comando grava um evento e devolve em menos de 10 ms. Nenhum deles bloqueia o agente.
+Every command writes one event and returns in under 10 ms. None of them blocks the agent.
 
-## 4. Os eventos
+## 4. Events
 
-Uma linha JSON por evento em `.apron/runs/<run>.jsonl`:
+One JSON line per event in `.apron/runs/<run>.jsonl`:
 
 ```json
-{"ts":"2026-11-19T20:31:04Z","run":"r-T1-0001","task":"T1","agent":"claude","machine":"nexus","kind":"step","msg":"parser do tasks.md com testes"}
+{"ts":"2026-11-19T20:31:04Z","run":"r-T1-0001","task":"T1","agent":"claude","machine":"nexus","kind":"step","msg":"tasks.md parser passes its tests"}
 ```
 
-| `kind` | Quando | Campos extras | Vira na interface |
+| `kind` | When | Extra fields | Shows up as |
 | --- | --- | --- | --- |
-| `run.started` | Ao pegar a tarefa | `intent` | Faixa em Executando, ● |
-| `step` | Ao mudar de fase do trabalho | — | Um ponto na trajetória |
-| `ask` | Precisa de uma decisão | — | ◐ e cartão nos portões |
-| `blocked` | Algo de fora impede o avanço | `cause` (gpu, budget, lock, machine, other) | ⊘ com a causa |
-| `note` | Algo que a próxima execução deve saber | — | Linha no log da sessão |
-| `check` | Um check rodou | `name`, `ok`, `ms` | Instrumento de checks |
-| `run.finished` | Ao terminar | `result` (done, failed, abandoned) | Faixa sai para Portões ou Revisão |
+| `run.started` | On picking up a task | `intent` | A card in Running, ● |
+| `step` | On changing work phase | — | A point on the trajectory |
+| `ask` | A decision is needed | — | ◐ and a card in Gates |
+| `blocked` | Something outside stops progress | `cause` (gpu, budget, lock, machine, other) | ⊘ with the cause |
+| `note` | Something the next run should know | — | A line in the session log |
+| `check` | A check ran | `name`, `ok`, `ms` | The checks instrument |
+| `run.finished` | On finishing | `result` (done, failed, abandoned) | The card moves to Gates or Review |
 
-Regras de escrita para o agente:
+Writing rules for the agent:
 
-- Uma frase por evento, no presente, dizendo o que mudou: "parser do tasks.md passa nos testes", não "estou trabalhando no parser".
-- `step` a cada mudança de fase (ler, planejar, editar, testar, corrigir), não a cada comando. Três a dez por execução.
-- `ask` só para o que é decisão da pessoa: regra de negócio, voltado ao cliente, arquitetura, escopo. Dúvida técnica o agente resolve.
-- O resumo do `run.finished` responde a três perguntas: o que foi feito, o que ficou de fora e o que a pessoa deve olhar primeiro.
+- One sentence per event, present tense, saying what changed: "tasks.md parser passes its tests", not "working on the parser".
+- Write in the project's language (`language` in `project.toml`).
+- A `step` on each change of phase (read, plan, edit, test, fix), not on each command. Three to ten per run.
+- `ask` only for what is a person's decision: business rules, anything customer-facing, architecture, scope. Technical doubts the agent solves itself.
+- The `run.finished` summary answers three questions: what was done, what was left out, and what the person should look at first.
 
-## 5. Como cada agente se conecta
+## 5. How each agent connects
 
-| Agente | Como o estado chega | Como os eventos chegam |
+| Agent | How state arrives | How events arrive |
 | --- | --- | --- |
-| Claude Code | Hooks (UserPromptSubmit, Notification, Stop, PreToolUse) chamam `apron report` | O agente chama `apron report` pelo shell, guiado pelo `AGENTS.md`; no v0b também por MCP |
-| Codex | `notify` chama `apron report` | Shell, guiado pelo `AGENTS.md` |
-| Pi | Extensão própria | Extensão e shell |
-| Outros | Processo em primeiro plano | Shell, se o agente souber ler o `AGENTS.md` |
+| Claude Code | Hooks (UserPromptSubmit, Notification, Stop, PreToolUse) call `apron report` | The agent calls `apron report` from the shell, guided by `AGENTS.md`; in v0b also over MCP |
+| Codex | `notify` calls `apron report` | Shell, guided by `AGENTS.md` |
+| Pi | Its own extension | Extension and shell |
+| Others | Foreground process | Shell, if the agent reads `AGENTS.md` |
 
-O `AGENTS.md` na raiz do repositório é o ponto de entrada: qualquer agente que leia instruções do projeto aprende o protocolo por ele.
+`AGENTS.md` at the repository root is the entry point: any agent that reads project instructions learns the protocol from it.
 
-## 6. O que o Apron mede sozinho
+## 6. What Apron measures on its own
 
-O agente não reporta nada disto; o Apron tira do git, da telemetria e do relógio:
+The agent reports none of this; Apron takes it from git, telemetry and the clock:
 
-- arquivos e linhas alterados, e o que saiu do `escopo`;
-- duração da execução e de cada passo;
-- tokens e custo (OpenTelemetry) ou tempo de GPU (modelo local);
-- resultado dos checks, quando rodam por `apron check`.
+- files and lines changed, and what left the `scope`;
+- duration of the run and of each step;
+- tokens and cost (OpenTelemetry) or GPU time (local model);
+- check results, when they run through `apron check`.
+
+## 7. Languages
+
+The interface is in English by default, with Brazilian Portuguese as the second language. `APRON_LANG` (`en` or `pt-BR`) chooses; without it, Apron follows the system locale and falls back to English. Code, comments, commits and these docs are in English. What agents write in events follows the project's `language`.

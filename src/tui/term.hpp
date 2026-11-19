@@ -1,4 +1,4 @@
-// O terminal de verdade: modo cru, tela alternativa, tamanho e teclas.
+// The real terminal: raw mode, alternate screen, size and keys.
 #pragma once
 
 #include <string>
@@ -14,8 +14,8 @@ struct KeyEvent {
 
 class Terminal {
  public:
-  Terminal();   // entra no modo cru e na tela alternativa
-  ~Terminal();  // restaura tudo, inclusive em saída por sinal
+  Terminal();   // enters raw mode and the alternate screen
+  ~Terminal();  // restores everything, also on exit by signal
   Terminal(const Terminal&) = delete;
   Terminal& operator=(const Terminal&) = delete;
 
@@ -23,7 +23,7 @@ class Terminal {
   int height() const { return h_; }
   bool ok() const { return ok_; }
 
-  // Espera até `timeout_ms` por uma tecla ou mudança de tamanho.
+  // Waits up to `timeout_ms` for a key or a resize.
   KeyEvent poll(int timeout_ms);
   void write(const std::string& bytes);
 

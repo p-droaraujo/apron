@@ -1,4 +1,4 @@
-// Utilidades da CLI: argumentos, saída colorida e o contexto do projeto.
+// CLI helpers: arguments, colored output and the project context.
 #pragma once
 
 #include <unistd.h>
@@ -10,13 +10,14 @@
 #include <string>
 #include <vector>
 
+#include "core/i18n.hpp"
 #include "core/project.hpp"
 
 namespace apron::cli {
 
 struct Args {
   std::vector<std::string> pos;
-  std::map<std::string, std::string> opt;  // --chave valor, ou --flag => "1"
+  std::map<std::string, std::string> opt;  // --key value, or --flag => "1"
 
   static Args parse(int argc, char** argv, int from, const std::vector<std::string>& flags = {});
   bool has(const std::string& key) const { return opt.count(key) > 0; }
@@ -24,11 +25,11 @@ struct Args {
     auto it = opt.find(key);
     return it == opt.end() ? fallback : it->second;
   }
-  // Junta os posicionais a partir de `from` numa frase só.
+  // Joins the positionals from `from` into one sentence.
   std::string rest(size_t from) const;
 };
 
-// Cores só quando a saída é um terminal e NO_COLOR não está definido.
+// Colors only when output is a terminal and NO_COLOR is not set.
 struct Style {
   bool on;
   Style() : on(isatty(STDOUT_FILENO) && !std::getenv("NO_COLOR")) {}
@@ -43,7 +44,7 @@ struct Style {
 };
 
 int fail(const std::string& message);
-// Encontra o projeto a partir do diretório atual, ou explica como criar um.
+// Finds the project from the current directory, or explains how to make one.
 std::optional<Project> require_project();
 std::string default_agent();
 
@@ -54,7 +55,7 @@ int cmd_runs(const Args& args);
 int cmd_tasks(const Args& args);
 int cmd_ui(const Args& args);
 
-// Atualiza o estado de uma tarefa no tasks.md; false se a tarefa não estiver lá.
-bool sync_task(const Project& project, const std::string& id, char state, const std::string& por);
+// Updates a task's state in tasks.md; false if the task is not there.
+bool sync_task(const Project& project, const std::string& id, char state, const std::string& by);
 
 }  // namespace apron::cli

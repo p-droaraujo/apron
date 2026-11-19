@@ -107,7 +107,7 @@ std::string Screen::flush() {
     }
   }
   full_ = false;
-  if (cur_y < 0) return "";  // nada mudou: nada a enviar
+  if (cur_y < 0) return "";  // nothing changed: nothing to send
   out += "\x1b[0m\x1b[?2026l";
   return out;
 }

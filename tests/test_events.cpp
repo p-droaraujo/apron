@@ -33,7 +33,7 @@ Event make(Kind kind, int64_t ts, std::string msg = "") {
 
 }  // namespace
 
-TEST("tempo: iso8601 ida e volta e durações curtas") {
+TEST("time: iso8601 round trip and short durations") {
   int64_t t = 1795120264120;  // 2026-11-19T20:31:04.120Z
   CHECK_EQ(timeutil::iso8601(t), std::string("2026-11-19T20:31:04.120Z"));
   CHECK_EQ(timeutil::parse_iso8601("2026-11-19T20:31:04.120Z").value_or(0), t);
@@ -42,7 +42,7 @@ TEST("tempo: iso8601 ida e volta e durações curtas") {
   CHECK_EQ(timeutil::short_duration(3900000), std::string("1h05m"));
 }
 
-TEST("eventos: gravar e ler preserva campos extras") {
+TEST("events: write and read keep extra fields") {
   fs::path file = temp_dir() / "r.jsonl";
   Event a = make(Kind::RunStarted, 1000);
   a.extra.emplace_back("intent", "fazer o parser");
@@ -59,7 +59,7 @@ TEST("eventos: gravar e ler preserva campos extras") {
   fs::remove_all(file.parent_path());
 }
 
-TEST("eventos: linhas corrompidas viram aviso, não erro") {
+TEST("events: corrupt lines become warnings, not errors") {
   fs::path file = temp_dir() / "r.jsonl";
   CHECK(append_event(file, make(Kind::Step, 1000, "um")));
   { FILE* f = std::fopen(file.c_str(), "a"); std::fputs("{quebrado\n", f); std::fclose(f); }
@@ -71,7 +71,7 @@ TEST("eventos: linhas corrompidas viram aviso, não erro") {
   fs::remove_all(file.parent_path());
 }
 
-TEST("resumo: o estado segue o último evento que importa") {
+TEST("summary: state follows the last event that matters") {
   std::vector<Event> ev{make(Kind::RunStarted, 0), make(Kind::Step, 10, "a")};
   CHECK(summarize("r", ev).state == RunState::Working);
   ev.push_back(make(Kind::Ask, 20, "pode mudar o schema?"));

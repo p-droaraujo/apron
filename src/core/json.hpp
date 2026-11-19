@@ -1,5 +1,5 @@
-// Um JSON mínimo: o suficiente para eventos e mensagens de controle.
-// Objetos preservam a ordem de inserção, para que os arquivos fiquem legíveis.
+// A minimal JSON: enough for events and control messages.
+// Objects keep insertion order so files stay readable.
 #pragma once
 
 #include <map>
@@ -44,9 +44,9 @@ struct Value {
   const Array& arr() const { return std::get<Array>(v); }
   const Object& obj() const { return std::get<Object>(v); }
 
-  // Busca uma chave num objeto; nullptr se não for objeto ou não houver a chave.
+  // Looks up a key; nullptr if this is not an object or the key is missing.
   const Value* find(std::string_view key) const;
-  // Texto da chave, ou o padrão se ela não existir ou não for texto.
+  // The key's string, or the fallback if it is missing or not a string.
   std::string get_str(std::string_view key, std::string_view fallback = "") const;
 };
 

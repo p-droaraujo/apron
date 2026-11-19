@@ -107,7 +107,7 @@ KeyEvent Terminal::poll(int timeout_ms) {
   }
   if (buf[0] == '\r' || buf[0] == '\n') return {Key::Enter, 0};
   if (buf[0] == '\t') return {Key::Tab, 0};
-  if (buf[0] == 3) return {Key::Char, 'q'};  // Ctrl-C sai
+  if (buf[0] == 3) return {Key::Char, 'q'};  // Ctrl-C quits
   return {Key::Char, buf[0]};
 }
 

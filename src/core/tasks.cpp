@@ -1,11 +1,23 @@
 #include "core/tasks.hpp"
 
+#include <array>
 #include <fstream>
 #include <sstream>
+
+#include "core/i18n.hpp"
 
 namespace apron {
 
 namespace {
+
+constexpr std::array<std::pair<std::string_view, std::string_view>, 6> kAliases{{
+    {"scope", "escopo"},
+    {"done-when", "pronto"},
+    {"depends", "depende"},
+    {"checks", "checks"},
+    {"decision", "decisão"},
+    {"by", "por"},
+}};
 
 std::string trim(std::string_view s) {
   size_t a = 0, b = s.size();
@@ -20,7 +32,7 @@ size_t indent_of(std::string_view s) {
   return n;
 }
 
-// "- [x] T1 Título" → estado, id, título.
+// "- [x] T1 Title" -> state, id, title.
 bool parse_task_line(std::string_view line, char& state, std::string& id, std::string& title) {
   size_t i = indent_of(line);
   if (line.substr(i, 3) != "- [" || line.size() < i + 6 || line[i + 4] != ']' || line[i + 5] != ' ') return false;
@@ -32,7 +44,7 @@ bool parse_task_line(std::string_view line, char& state, std::string& id, std::s
   return !id.empty();
 }
 
-// "  chave: valor" com indentação maior que a da tarefa.
+// "  key: value", indented deeper than the task.
 bool parse_field_line(std::string_view line, size_t task_indent, std::string& key, std::string& value) {
   size_t i = indent_of(line);
   if (i <= task_indent || i >= line.size()) return false;
@@ -42,7 +54,7 @@ bool parse_field_line(std::string_view line, size_t task_indent, std::string& ke
   if (colon == std::string::npos || colon == 0) return false;
   std::string_view k = body.substr(0, colon);
   for (char c : k)
-    if (c == ' ') return false;  // chaves são uma palavra só
+    if (c == ' ') return false;  // keys are a single word
   key = std::string(k);
   value = trim(body.substr(colon + 1));
   return true;
@@ -50,15 +62,33 @@ bool parse_field_line(std::string_view line, size_t task_indent, std::string& ke
 
 }  // namespace
 
-std::string Task::field(std::string_view key) const {
+std::string_view canonical_key(std::string_view key) {
+  for (auto [en, pt] : kAliases)
+    if (key == en || key == pt) return en;
+  return key;
+}
+
+std::string_view portuguese_key(std::string_view canonical) {
+  for (auto [en, pt] : kAliases)
+    if (canonical == en) return pt;
+  return canonical;
+}
+
+std::string Task::field(std::string_view canonical) const {
   for (const auto& [k, v] : fields)
-    if (k == key) return v;
+    if (canonical_key(k) == canonical) return v;
   return "";
+}
+
+bool Task::written_in_portuguese() const {
+  for (const auto& [k, v] : fields)
+    if (k != "checks" && canonical_key(k) != k) return true;
+  return false;
 }
 
 std::vector<std::string> Task::depends() const {
   std::vector<std::string> out;
-  std::stringstream ss(field("depende"));
+  std::stringstream ss(field(kDepends));
   std::string item;
   while (std::getline(ss, item, ',')) {
     item = trim(item);
@@ -80,7 +110,7 @@ TaskFile TaskFile::from_text(const std::string& text) {
 std::optional<TaskFile> TaskFile::load(const std::filesystem::path& file, std::string* error) {
   std::ifstream in(file);
   if (!in) {
-    if (error) *error = "não consegui ler " + file.string();
+    if (error) *error = trf("cannot read {}", {file.string()});
     return std::nullopt;
   }
   std::stringstream ss;
@@ -127,21 +157,24 @@ bool TaskFile::set_state(std::string_view id, char state) {
   return true;
 }
 
-bool TaskFile::set_field(std::string_view id, std::string_view key, std::string_view value) {
+bool TaskFile::set_field(std::string_view id, std::string_view canonical, std::string_view value) {
   const Task* t = find(id);
   if (!t) return false;
-  std::string indent(indent_of(lines_[t->line]) + 2, ' ');
+  size_t task_indent = indent_of(lines_[t->line]);
   for (size_t j = t->line + 1; j <= t->last_line; ++j) {
     std::string k, v;
-    if (parse_field_line(lines_[j], indent.size() - 2, k, v) && k == key) {
+    if (parse_field_line(lines_[j], task_indent, k, v) && canonical_key(k) == canonical) {
       if (value.empty()) lines_.erase(lines_.begin() + static_cast<long>(j));
-      else lines_[j] = std::string(lines_[j].substr(0, indent_of(lines_[j]))) + std::string(key) + ": " + std::string(value);
+      else lines_[j] = lines_[j].substr(0, indent_of(lines_[j])) + k + ": " + std::string(value);
       reparse();
       return true;
     }
   }
   if (value.empty()) return true;
-  lines_.insert(lines_.begin() + static_cast<long>(t->last_line + 1), indent + std::string(key) + ": " + std::string(value));
+  std::string_view key = t->written_in_portuguese() ? portuguese_key(canonical) : canonical;
+  std::string indent(task_indent + 2, ' ');
+  lines_.insert(lines_.begin() + static_cast<long>(t->last_line + 1),
+                indent + std::string(key) + ": " + std::string(value));
   reparse();
   return true;
 }
@@ -156,35 +189,35 @@ std::string TaskFile::text() const {
 }
 
 bool TaskFile::save(const std::filesystem::path& file, std::string* error) const {
-  // Escreve num arquivo ao lado e renomeia: quem lê nunca vê o arquivo pela metade.
+  // Write next to it and rename: readers never see a half-written file.
   std::filesystem::path tmp = file;
   tmp += ".tmp";
   {
     std::ofstream out(tmp, std::ios::trunc | std::ios::binary);
     out << text();
     if (!out) {
-      if (error) *error = "não consegui escrever " + tmp.string();
+      if (error) *error = trf("cannot write {}", {tmp.string()});
       return false;
     }
   }
   std::error_code ec;
   std::filesystem::rename(tmp, file, ec);
-  if (ec && error) *error = "não consegui substituir " + file.string() + ": " + ec.message();
+  if (ec && error) *error = trf("cannot replace {}: {}", {file.string(), ec.message()});
   return !ec;
 }
 
 std::vector<std::string> blockers_to_start(const TaskFile& file, const Task& task) {
   std::vector<std::string> why;
-  if (task.field("escopo").empty()) why.push_back("falta o campo escopo");
-  if (task.field("pronto").empty()) why.push_back("falta o campo pronto");
-  if (task.state == '~') why.push_back("já está em andamento (" + task.field("por") + ")");
-  if (task.state == 'x') why.push_back("já está feita");
-  if (task.state == '-') why.push_back("foi abandonada");
-  if (task.state == '?') why.push_back("espera uma decisão da pessoa");
+  if (task.field(kScope).empty()) why.push_back(tr("missing the scope field"));
+  if (task.field(kDoneWhen).empty()) why.push_back(tr("missing the done-when field"));
+  if (task.state == '~') why.push_back(trf("already in progress ({})", {task.field(kBy)}));
+  if (task.state == 'x') why.push_back(tr("already done"));
+  if (task.state == '-') why.push_back(tr("was abandoned"));
+  if (task.state == '?') why.push_back(tr("waiting for a decision from a person"));
   for (const auto& dep : task.depends()) {
     const Task* d = file.find(dep);
-    if (!d) why.push_back("depende de " + dep + ", que não existe");
-    else if (d->state != 'x') why.push_back("depende de " + dep + ", que ainda não está feita");
+    if (!d) why.push_back(trf("depends on {}, which does not exist", {dep}));
+    else if (d->state != 'x') why.push_back(trf("depends on {}, which is not done yet", {dep}));
   }
   return why;
 }

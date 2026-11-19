@@ -1,7 +1,8 @@
-# Projeto Apron, gerenciado pelo próprio Apron.
+# The Apron project, managed by Apron itself.
 name = "apron"
-mode = "manual"          # manual | auto (auto só com checks declarados)
+language = "en"          # language agents write events in
+mode = "manual"          # manual | auto (auto only with declared checks)
 
 [decisions]
-# Tocar estes caminhos transforma a execução em decisão (◐).
+# Touching these paths turns a run into a decision (◐).
 paths = ["docs/agent-protocol.md", ".apron/policy.toml"]

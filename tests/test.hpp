@@ -1,4 +1,4 @@
-// Um framework de teste de um arquivo: TEST registra, CHECK falha sem abortar.
+// A one-file test framework: TEST registers, CHECK fails without aborting.
 #pragma once
 
 #include <cstdio>
@@ -39,7 +39,7 @@ struct Register {
   do {                                                                           \
     if (!(cond)) {                                                               \
       ++::apron::test::failures();                                               \
-      std::fprintf(stderr, "  falhou: %s (%s:%d)\n", #cond, __FILE__, __LINE__); \
+      std::fprintf(stderr, "  failed: %s (%s:%d)\n", #cond, __FILE__, __LINE__); \
     }                                                                            \
   } while (0)
 
@@ -49,6 +49,6 @@ struct Register {
     auto&& _b = (b);                                                                                      \
     if (!(_a == _b)) {                                                                                    \
       ++::apron::test::failures();                                                                        \
-      std::fprintf(stderr, "  falhou: %s == %s (%s:%d)\n", #a, #b, __FILE__, __LINE__);                   \
+      std::fprintf(stderr, "  failed: %s == %s (%s:%d)\n", #a, #b, __FILE__, __LINE__);                   \
     }                                                                                                     \
   } while (0)

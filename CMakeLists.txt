@@ -10,7 +10,7 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
-# Núcleo sem dependências externas: JSON, eventos, tarefas, checks.
+# Core with no external dependencies: JSON, events, tasks, i18n.
 add_library(apron_core
   src/core/json.cpp
   src/core/events.cpp
@@ -18,13 +18,14 @@ add_library(apron_core
   src/core/time.cpp
   src/core/runs.cpp
   src/core/tasks.cpp
+  src/core/i18n.cpp
 )
 
-# A TUI: terminal, grade de células e o Andamento.
+# The TUI: terminal, cell grid and the progress view.
 add_library(apron_tui
   src/tui/term.cpp
   src/tui/screen.cpp
-  src/tui/andamento.cpp
+  src/tui/progress.cpp
 )
 target_link_libraries(apron_tui PUBLIC apron_core)
 target_include_directories(apron_core PUBLIC src)
@@ -40,6 +41,7 @@ add_executable(apron
 target_link_libraries(apron PRIVATE apron_tui)
 
 enable_testing()
-add_executable(apron_tests tests/test_main.cpp tests/test_json.cpp tests/test_events.cpp tests/test_tasks.cpp tests/test_tui.cpp)
+add_executable(apron_tests tests/test_main.cpp tests/test_json.cpp tests/test_events.cpp tests/test_tasks.cpp tests/test_tui.cpp tests/test_i18n.cpp)
 target_link_libraries(apron_tests PRIVATE apron_tui)
+target_compile_definitions(apron_tests PRIVATE APRON_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
 add_test(NAME core COMMAND apron_tests)

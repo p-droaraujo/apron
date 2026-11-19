@@ -2,21 +2,24 @@
 
 #include <algorithm>
 
+#include "core/i18n.hpp"
 #include "core/time.hpp"
 
 namespace apron {
 
 std::string_view to_string(RunState state) {
   switch (state) {
-    case RunState::Working: return "trabalhando";
-    case RunState::Waiting: return "espera por você";
-    case RunState::Blocked: return "sem energia";
-    case RunState::Done: return "feita";
-    case RunState::Failed: return "falhou";
-    case RunState::Abandoned: return "abandonada";
+    case RunState::Working: return "working";
+    case RunState::Waiting: return "waiting for you";
+    case RunState::Blocked: return "no power";
+    case RunState::Done: return "done";
+    case RunState::Failed: return "failed";
+    case RunState::Abandoned: return "abandoned";
   }
-  return "trabalhando";
+  return "working";
 }
+
+std::string label(RunState state) { return tr(to_string(state)); }
 
 RunSummary summarize(const std::string& id, const std::vector<Event>& events) {
   RunSummary s;
@@ -30,7 +33,7 @@ RunSummary summarize(const std::string& id, const std::vector<Event>& events) {
     if (s.task.empty()) s.task = e.task;
     if (s.agent.empty()) s.agent = e.agent;
     if (s.machine.empty()) s.machine = e.machine;
-    // Notas são para a próxima execução, não para o status de agora.
+    // Notes are for the next run, not for the status of this one.
     if (!e.msg.empty() && e.kind != Kind::Note) s.last_msg = e.msg;
     switch (e.kind) {
       case Kind::RunStarted:
@@ -39,7 +42,7 @@ RunSummary summarize(const std::string& id, const std::vector<Event>& events) {
         break;
       case Kind::Step:
         ++s.steps;
-        s.state = RunState::Working;  // voltou a andar
+        s.state = RunState::Working;  // moving again
         break;
       case Kind::Ask: s.state = RunState::Waiting; break;
       case Kind::Blocked: s.state = RunState::Blocked; break;

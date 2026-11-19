@@ -51,14 +51,14 @@ json::Value Event::to_json() const {
 
 std::optional<Event> Event::from_json(const json::Value& value, std::string* error) {
   if (!value.is_object()) {
-    if (error) *error = "evento não é um objeto";
+    if (error) *error = "event is not an object";
     return std::nullopt;
   }
   Event e;
   auto ts = timeutil::parse_iso8601(value.get_str("ts"));
   auto kind = kind_from_string(value.get_str("kind"));
   if (!ts || !kind) {
-    if (error) *error = "evento sem ts ou kind válidos";
+    if (error) *error = "event without a valid ts or kind";
     return std::nullopt;
   }
   e.ts_ms = *ts;
@@ -96,13 +96,13 @@ bool append_event(const std::filesystem::path& file, const Event& event, std::st
   line += '\n';
   int fd = ::open(file.c_str(), O_WRONLY | O_CREAT | O_APPEND | O_CLOEXEC, 0644);
   if (fd < 0) {
-    if (error) *error = std::string("não consegui abrir ") + file.string() + ": " + std::strerror(errno);
+    if (error) *error = std::string("cannot open ") + file.string() + ": " + std::strerror(errno);
     return false;
   }
   ssize_t written = ::write(fd, line.data(), line.size());
   ::close(fd);
   if (written != static_cast<ssize_t>(line.size())) {
-    if (error) *error = "escrita incompleta em " + file.string();
+    if (error) *error = "short write to " + file.string();
     return false;
   }
   return true;

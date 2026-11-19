@@ -1,11 +1,11 @@
-// apron (sem argumentos): o Andamento no terminal.
+// apron (no arguments): the Andamento in the terminal.
 #include <unistd.h>
 
 #include <algorithm>
 
 #include "cli/common.hpp"
 #include "core/time.hpp"
-#include "tui/andamento.hpp"
+#include "tui/progress.hpp"
 #include "tui/term.hpp"
 
 namespace apron::cli {
@@ -13,10 +13,10 @@ namespace apron::cli {
 int cmd_ui(const Args&) {
   auto project = require_project();
   if (!project) return 1;
-  if (!isatty(STDOUT_FILENO)) return fail("o Andamento precisa de um terminal; fora dele, use apron runs ou apron tasks");
+  if (!isatty(STDOUT_FILENO)) return fail(tr("the progress view needs a terminal; outside one, use apron runs or apron tasks"));
 
   tui::Terminal term;
-  if (!term.ok()) return fail("não consegui colocar o terminal em modo cru");
+  if (!term.ok()) return fail(tr("could not put the terminal in raw mode"));
 
   tui::Screen screen;
   screen.resize(term.width(), term.height());
@@ -24,13 +24,13 @@ int cmd_ui(const Args&) {
   tui::View view;
   tui::clamp_selection(model, view);
 
-  enum class Mode { Andamento, Log, Task } mode = Mode::Andamento;
+  enum class Mode { Progress, Log, Task } mode = Mode::Progress;
   std::string open_run, open_task;
   int scroll = 0;
   int64_t last_load = timeutil::now_ms();
 
-  // ~10 quadros por segundo; os dados recarregam a cada segundo. Um quadro
-  // sem mudança não envia nada ao terminal.
+  // ~10 frames per second; data reloads every second. A frame with no
+  // change sends nothing to the terminal.
   while (true) {
     int64_t now = timeutil::now_ms();
     if (now - last_load >= 1000) {
@@ -39,7 +39,7 @@ int cmd_ui(const Args&) {
       last_load = now;
     }
     switch (mode) {
-      case Mode::Andamento: tui::render_andamento(screen, model, view, now); break;
+      case Mode::Progress: tui::render_progress(screen, model, view, now); break;
       case Mode::Log: tui::render_log(screen, *project, open_run, scroll, now); break;
       case Mode::Task: tui::render_task(screen, *project, open_task); break;
     }
@@ -52,12 +52,12 @@ int cmd_ui(const Args&) {
       continue;
     }
     if (k.key == tui::Key::Char && k.ch == 'q') {
-      if (mode == Mode::Andamento) break;
-      mode = Mode::Andamento;
+      if (mode == Mode::Progress) break;
+      mode = Mode::Progress;
       continue;
     }
-    if (mode != Mode::Andamento) {
-      if (k.key == tui::Key::Esc) mode = Mode::Andamento;
+    if (mode != Mode::Progress) {
+      if (k.key == tui::Key::Esc) mode = Mode::Progress;
       else if (k.key == tui::Key::Up || (k.key == tui::Key::Char && k.ch == 'k')) scroll = std::max(0, scroll - 1);
       else if (k.key == tui::Key::Down || (k.key == tui::Key::Char && k.ch == 'j')) ++scroll;
       continue;

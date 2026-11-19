@@ -8,17 +8,19 @@ The apron is where aircraft park, refuel and get checked between flights. Apron 
 
 ## What works today
 
-`apron` with no arguments opens the Andamento: four lanes (plan, running, gates, done) built from `.apron/tasks.md` and the run events, refreshing as agents report. Arrows or hjkl move, Enter opens a run's timeline or a task's fields, `q` quits. It reads local files only; the view across machines comes with the daemon and the hub.
+`apron` with no arguments opens the progress view: four lanes (plan, running, gates, done) built from `.apron/tasks.md` and the run events, refreshing as agents report. Arrows or hjkl move, Enter opens a run's timeline or a task's fields, `q` quits. It reads local files only; the view across machines comes with the daemon and the hub.
 
 ```
- apron · nexus                                                                         20:41 UTC
- PLANO 8                    EXECUTANDO 1               PORTÕES 0          FEITO 2
- ────────────────────────   ────────────────────────   ──────────────     ──────────────────────
- ○ T3 apron check roda o…   ▌ ● claude@nexus   2m57s   —                  ✓ T2 O tasks.md é… 7m
- ○ T4 Medidor de escopo:…   ▌ T11 TUI do Andamento …                      ✓ T1 Eventos locais…
- ◌ T7 Eventos vão p… ← T6   ▌ Andamento roda num ps…
- APRON  ● 1                                                                              ? ajuda
+ shop · mac                                                                            20:52 UTC
+ PLAN 2                        RUNNING 3                     GATES 1                     DONE 1
+ ───────────────────────────   ───────────────────────────   ─────────────────────────   ──────────────────────
+ ◌ S5 Load tests        ← S4   ▌ ● pi@nexus          9m20s   ▌ ◐ codex@mac        9m20s   ✓ S1 Price parser   9m
+ ◌ S7 Rate limit per c… ← S6   ▌ S6 JSON logs                ▌ S3 Email confirmation   
+                               ▌ JSON format defined; rep…   ▌ change the confirmation…
+ APRON  ◐ 1  ● 2  ⊘ 1                                                                        ? help
 ```
+
+The interface is in English, with Brazilian Portuguese as the second language: set `APRON_LANG=pt-BR`, or let Apron follow the system locale. `tasks.md` accepts its keys in either language (`scope` or `escopo`, `done-when` or `pronto`).
 
 Under it, the event layer: an agent starts a run, narrates it in short structured events, and finishes it.
 

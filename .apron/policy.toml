@@ -1,4 +1,4 @@
-# O que um agente pode fazer neste repositório sem perguntar.
+# What an agent may do in this repository without asking.
 [allow]
 commands = ["cmake", "ctest", "ninja", "git status", "git diff", "git add", "git commit", "./build/apron"]
 

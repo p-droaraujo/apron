@@ -1,8 +1,9 @@
-#include "tui/andamento.hpp"
+#include "tui/progress.hpp"
 
 #include <algorithm>
 #include <map>
 
+#include "core/i18n.hpp"
 #include "core/tasks.hpp"
 #include "core/time.hpp"
 
@@ -10,7 +11,7 @@ namespace apron::tui {
 
 namespace {
 
-// A paleta da linguagem v2: cor só para estado.
+// The v2 palette: color only for state.
 const Style kText{Color::hex(0xe6e8eb), {}, false};
 const Style kBold{Color::hex(0xe6e8eb), {}, true};
 const Style kSoft{Color::hex(0xa3aab5), {}, false};
@@ -51,7 +52,7 @@ const char* state_glyph(RunState s) {
 
 std::string ago(int64_t now, int64_t then) { return timeutil::short_duration(now - then); }
 
-// Títulos vêm do markdown; na tela, crases não ajudam ninguém.
+// Titles come from markdown; on screen, backticks help nobody.
 std::string plain(std::string s) {
   s.erase(std::remove(s.begin(), s.end(), '`'), s.end());
   return s;
@@ -99,7 +100,7 @@ Model load_model(const Project& project) {
     if (r.state == RunState::Working) ++m.working;
     if (r.state == RunState::Waiting) ++m.waiting;
     if (r.state == RunState::Blocked) ++m.blocked;
-    // Uma tarefa aparece uma vez só: pela execução mais recente.
+    // A task shows up once: through its most recent run.
     if (task_has_run[r.task] && it.lane == Lane::Feito) continue;
     task_has_run[r.task] = true;
     m.lanes[static_cast<int>(it.lane)].push_back(std::move(it));
@@ -122,12 +123,12 @@ Model load_model(const Project& project) {
           it.detail = deps.empty() ? why.front() : "← " + deps;
         }
       } else if (t.state == '~') {
-        it.lane = Lane::Executando;  // em andamento noutra máquina
-        it.detail = "em outra máquina";
+        it.lane = Lane::Executando;  // in progress on another machine
+        it.detail = tr("on another machine");
       } else if (t.state == '?') {
         it.lane = Lane::Portoes;
         it.state = RunState::Waiting;
-        it.detail = "espera uma decisão";
+        it.detail = tr("waiting for a decision");
       } else if (t.state == 'x') {
         it.lane = Lane::Feito;
         it.state = RunState::Done;
@@ -137,7 +138,7 @@ Model load_model(const Project& project) {
       m.lanes[static_cast<int>(it.lane)].push_back(std::move(it));
     }
   }
-  // Plano: as prontas primeiro, na ordem do arquivo.
+  // Plan: ready tasks first, in file order.
   std::stable_sort(m.lanes[0].begin(), m.lanes[0].end(), [](const Item& a, const Item& b) { return a.ready > b.ready; });
   return m;
 }
@@ -148,18 +149,18 @@ void clamp_selection(const Model& model, View& view) {
   view.index = n == 0 ? 0 : std::clamp(view.index, 0, n - 1);
 }
 
-void render_andamento(Screen& sc, const Model& m, const View& v, int64_t now) {
+void render_progress(Screen& sc, const Model& m, const View& v, int64_t now) {
   sc.clear();
   int W = sc.width(), H = sc.height();
 
-  // Cabeçalho: o projeto e a máquina.
+  // Header: the project and the machine.
   int x = sc.put(1, 0, m.project, kBold);
   sc.put(1 + x + 1, 0, "· " + m.machine, kDim);
   std::string clock = timeutil::iso8601(now).substr(11, 5) + " UTC";
   sc.put(W - text_width(clock) - 1, 0, clock, kDim);
 
-  // Quatro faixas.
-  const char* names[4] = {"PLANO", "EXECUTANDO", "PORTÕES", "FEITO"};
+  // Four lanes.
+  const std::string names[4] = {tr("PLAN"), tr("RUNNING"), tr("GATES"), tr("DONE")};
   int gap = 3, left = 1;
   int cw = std::max(12, (W - 2 - gap * 3) / 4);
   int top = 2, bottom = H - 2;
@@ -175,7 +176,7 @@ void render_andamento(Screen& sc, const Model& m, const View& v, int64_t now) {
       const Item& it = items[i];
       bool sel = v.lane == lane && v.index == static_cast<int>(i);
       if (lane == 0 || lane == 3) {
-        // Uma linha por tarefa.
+        // One line per task.
         const char* g = lane == 3 ? state_glyph(it.state) : it.ready ? "○" : "◌";
         Style gs = lane == 3 ? state_style(it.state) : it.ready ? kSoft : kLine;
         if (lane == 3 && it.state == RunState::Done) gs = kSoft;
@@ -190,7 +191,7 @@ void render_andamento(Screen& sc, const Model& m, const View& v, int64_t now) {
         y += 1;
         continue;
       }
-      // Cartão de três linhas com a barra lateral na cor do estado.
+      // A three-line card with the side bar in the state color.
       Style bar = state_style(it.state);
       bool breathing = it.state == RunState::Working && it.from_run;
       Style gstyle = breathing && (v.tick / 6) % 2 ? kBlue2 : bar;
@@ -211,13 +212,13 @@ void render_andamento(Screen& sc, const Model& m, const View& v, int64_t now) {
     if (items.empty()) sc.put(lx, top + 2, "—", kLine);
   }
 
-  // Barra de status: só estado real.
+  // Status bar: real state only.
   int sy = H - 1;
   int bx = sc.put(0, sy, " APRON ", kBadge) + 1;
   if (m.waiting) bx += sc.put(bx, sy, "◐ " + std::to_string(m.waiting), kAmber) + 2;
   if (m.working) bx += sc.put(bx, sy, "● " + std::to_string(m.working), kBlue) + 2;
   if (m.blocked) bx += sc.put(bx, sy, "⊘ " + std::to_string(m.blocked), kDim) + 2;
-  std::string hint = v.help ? "←→↑↓ navegar · enter abrir · esc voltar · q sair" : "? ajuda";
+  std::string hint = v.help ? tr("←→↑↓ move · enter open · esc back · q quit") : tr("? help");
   sc.put(W - text_width(hint) - 1, sy, hint, kDim);
 }
 
@@ -229,7 +230,7 @@ void render_log(Screen& sc, const Project& project, const std::string& run, int 
   int x = sc.put(1, 0, s.task, kBold);
   x += 1 + sc.put(2 + x, 0, "· " + s.agent + "@" + s.machine, kSoft);
   x += 1 + sc.put(2 + x, 0, "· " + timeutil::short_duration(s.last_ms - s.started_ms), kDim);
-  sc.put(3 + x, 0, std::string(state_glyph(s.state)) + " " + std::string(to_string(s.state)), state_style(s.state));
+  sc.put(3 + x, 0, std::string(state_glyph(s.state)) + " " + label(s.state), state_style(s.state));
   sc.put(1, 1, run, kLine);
   (void)now;
 
@@ -237,31 +238,32 @@ void render_log(Screen& sc, const Project& project, const std::string& run, int 
   for (size_t i = static_cast<size_t>(std::max(0, scroll)); i < events.size() && y < H - 1; ++i, ++y) {
     const Event& e = events[i];
     sc.put(1, y, timeutil::short_duration(e.ts_ms - s.started_ms), kDim);
-    std::string g = "·", label = "passo", msg = e.msg;
+    std::string g = "·", what = tr("step"), msg = e.msg;
     Style gs = kBlue, ls = kSoft, ms = kText;
     switch (e.kind) {
-      case Kind::RunStarted: g = "▶"; label = "iniciou"; msg = e.extra_str("intent"); break;
+      case Kind::RunStarted: g = "▶"; what = tr("started"); msg = e.extra_str("intent"); break;
       case Kind::Step: break;
-      case Kind::Ask: g = "◐"; label = "pergunta"; gs = ls = ms = kAmber; break;
-      case Kind::Blocked: g = "⊘"; label = "sem energia"; gs = kDim; msg = "(" + e.extra_str("cause") + ") " + msg; break;
-      case Kind::Note: g = "›"; label = "nota"; gs = kDim; ms = kSoft; break;
+      case Kind::Ask: g = "◐"; what = tr("question"); gs = ls = ms = kAmber; break;
+      case Kind::Blocked: g = "⊘"; what = tr("no power"); gs = kDim; msg = "(" + e.extra_str("cause") + ") " + msg; break;
+      case Kind::Note: g = "›"; what = tr("note"); gs = kDim; ms = kSoft; break;
       case Kind::Check: {
         const json::Value* ok = e.extra_find("ok");
         bool passed = ok && ok->is_bool() && ok->boolean();
         g = passed ? "✓" : "✕";
         gs = passed ? kSoft : kRed;
-        label = "check";
+        what = tr("check");
         msg = e.extra_str("name");
         break;
       }
-      case Kind::RunFinished: g = "■"; label = "terminou"; gs = kText; msg = e.extra_str("result") + (e.msg.empty() ? "" : " · " + e.msg); break;
+      case Kind::RunFinished: g = "■"; what = tr("finished"); gs = kText; msg = e.extra_str("result") + (e.msg.empty() ? "" : " · " + e.msg); break;
     }
     sc.put(9, y, g, gs);
-    sc.put(11, y, label, ls);
+    sc.put(11, y, what, ls);
     sc.put(24, y, fit(msg, W - 25), ms);
   }
   sc.put(0, H - 1, " APRON ", kBadge);
-  sc.put(W - 22, H - 1, "↑↓ rolar · esc voltar", kDim);
+  std::string back = tr("↑↓ scroll · esc back");
+  sc.put(W - text_width(back) - 1, H - 1, back, kDim);
 }
 
 void render_task(Screen& sc, const Project& project, const std::string& id) {
@@ -270,7 +272,7 @@ void render_task(Screen& sc, const Project& project, const std::string& id) {
   const Task* t = file ? file->find(id) : nullptr;
   int W = sc.width(), H = sc.height();
   if (!t) {
-    sc.put(1, 0, id + " não está no tasks.md", kDim);
+    sc.put(1, 0, trf("{} is not in tasks.md", {id}), kDim);
   } else {
     int x = sc.put(1, 0, t->id, kBold);
     sc.put(2 + x, 0, fit(plain(t->title), W - 3 - x), kText);
@@ -285,13 +287,14 @@ void render_task(Screen& sc, const Project& project, const std::string& id) {
     auto why = blockers_to_start(*file, *t);
     if (t->state == ' ') {
       ++y;
-      if (why.empty()) sc.put(1, y, "○ pronta para pegar", kSoft);
+      if (why.empty()) sc.put(1, y, "○ " + tr("ready to pick up"), kSoft);
       for (const auto& w : why)
         if (y < H - 1) sc.put(1, y++, "◌ " + w, kDim);
     }
   }
   sc.put(0, H - 1, " APRON ", kBadge);
-  sc.put(W - 12, H - 1, "esc voltar", kDim);
+  std::string back = tr("esc back");
+  sc.put(W - text_width(back) - 1, H - 1, back, kDim);
 }
 
 }  // namespace apron::tui

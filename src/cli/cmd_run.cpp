@@ -12,30 +12,30 @@ namespace apron::cli {
 namespace {
 
 int run_start(const Args& args, const Project& project) {
-  if (args.pos.size() < 2) return fail("uso: apron run start <tarefa> [--agent nome] [--intent \"frase\"]");
+  if (args.pos.size() < 2) return fail(tr("usage: apron run start <task> [--agent name] [--intent \"sentence\"]"));
   if (auto current = project.current_run()) {
-    return fail("já existe uma execução em curso neste worktree (" + *current +
-                "); feche com apron run finish antes de começar outra");
+    return fail(trf("a run is already in progress in this worktree ({}); close it with apron run finish first",
+                    {*current}));
   }
-  // O contrato mínimo: tarefa com escopo e pronto, dependências feitas.
+  // The minimum contract: a task with scope and done-when, dependencies done.
   const std::string& id = args.pos[1];
   auto file = TaskFile::load(project.tasks_file());
   const Task* task = file ? file->find(id) : nullptr;
   if (task) {
     auto why = blockers_to_start(*file, *task);
     if (!why.empty() && !args.has("force")) {
-      std::string msg = "a tarefa " + id + " não pode ser pega:";
+      std::string msg = trf("task {} cannot be picked up:", {id});
       for (const auto& w : why) msg += "\n  - " + w;
-      return fail(msg + "\n(use --force para começar mesmo assim)");
+      return fail(msg + "\n" + tr("(use --force to start anyway)"));
     }
   } else {
-    std::fprintf(stderr, "aviso: %s não está no tasks.md; a execução fica avulsa\n", id.c_str());
+    std::fprintf(stderr, "%s\n", trf("warning: {} is not in tasks.md; the run stands alone", {id}).c_str());
   }
 
   int64_t now = timeutil::now_ms();
   Event e;
   e.ts_ms = now;
-  e.task = args.pos[1];
+  e.task = id;
   e.run = new_run_id(e.task, now);
   e.agent = args.get("agent", default_agent());
   e.machine = machine_name();
@@ -55,14 +55,14 @@ int run_finish(const Args& args, const Project& project) {
   std::string run = args.get("run");
   if (run.empty()) {
     auto current = project.current_run();
-    if (!current) return fail("nenhuma execução em curso; use --run <id>");
+    if (!current) return fail(tr("no run in progress; use --run <id>"));
     run = *current;
   }
   auto events = load_events(project.run_file(run));
-  if (events.empty()) return fail("execução não encontrada: " + run);
+  if (events.empty()) return fail(trf("run not found: {}", {run}));
   std::string result = args.get("result", "done");
   if (result != "done" && result != "failed" && result != "abandoned")
-    return fail("--result precisa ser done, failed ou abandoned");
+    return fail(tr("--result must be done, failed or abandoned"));
 
   const Event& first = events.front();
   Event e;
@@ -95,7 +95,7 @@ int cmd_run(const Args& args) {
     std::printf("%s\n", current->c_str());
     return 0;
   }
-  return fail("uso: apron run start|finish|current");
+  return fail(tr("usage: apron run start|finish|current"));
 }
 
 }  // namespace apron::cli

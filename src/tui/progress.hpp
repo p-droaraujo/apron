@@ -1,4 +1,4 @@
-// O Andamento: o que existe no tasks.md e nos eventos, em quatro faixas.
+// Progress (Andamento): what tasks.md and the events hold, in four lanes.
 #pragma once
 
 #include <cstdint>
@@ -15,15 +15,15 @@ enum class Lane { Plano, Executando, Portoes, Feito };
 
 struct Item {
   Lane lane = Lane::Plano;
-  std::string task;    // id da tarefa
+  std::string task;    // task id
   std::string title;
-  std::string who;     // agente@máquina
-  std::string detail;  // última frase, dependências ou motivo
-  std::string run;     // id da execução, se houver
+  std::string who;     // agent@machine
+  std::string detail;  // last sentence, dependencies or reason
+  std::string run;     // run id, if any
   RunState state = RunState::Working;
-  bool ready = false;  // tarefa aberta com dependências feitas
+  bool ready = false;  // open task whose dependencies are done
   bool from_run = false;
-  int64_t since_ms = 0;  // início da execução ou último evento
+  int64_t since_ms = 0;  // run start or last event
 };
 
 struct Model {
@@ -36,18 +36,18 @@ struct Model {
 Model load_model(const Project& project);
 
 struct View {
-  int lane = 1;     // faixa selecionada
-  int index = 0;    // item selecionado na faixa
+  int lane = 1;     // selected lane
+  int index = 0;    // selected item in the lane
   bool help = false;
-  int tick = 0;     // para a respiração de quem trabalha
+  int tick = 0;     // drives the breathing of working agents
 };
 
 void clamp_selection(const Model& model, View& view);
-void render_andamento(Screen& screen, const Model& model, const View& view, int64_t now_ms);
+void render_progress(Screen& screen, const Model& model, const View& view, int64_t now_ms);
 
-// Linha do tempo de uma execução, com rolagem.
+// A run's timeline, scrollable.
 void render_log(Screen& screen, const Project& project, const std::string& run, int scroll, int64_t now_ms);
-// Os campos de uma tarefa sem execução.
+// The fields of a task with no run.
 void render_task(Screen& screen, const Project& project, const std::string& task);
 
 }  // namespace apron::tui

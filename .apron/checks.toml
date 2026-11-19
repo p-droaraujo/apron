@@ -1,4 +1,4 @@
-# Cada check é um comando; código de saída 0 = passou.
+# Each check is a command; exit code 0 means it passed.
 [[check]]
 name = "build"
 run  = "cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug >/dev/null && cmake --build build"

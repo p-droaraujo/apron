@@ -1,6 +1,5 @@
 #include <cstdio>
 #include <cstring>
-#include <iostream>
 
 #include "cli/common.hpp"
 
@@ -44,34 +43,35 @@ int fail(const std::string& message) {
 
 std::optional<Project> require_project() {
   auto project = find_project(std::filesystem::current_path());
-  if (!project) fail("nenhum .apron/ encontrado daqui até a raiz; crie um com mkdir .apron e um tasks.md");
+  if (!project) fail(tr("no .apron/ found from here to the root; create one with mkdir .apron and a tasks.md"));
   return project;
 }
 
 std::string default_agent() {
   if (const char* env = std::getenv("APRON_AGENT"); env && *env) return env;
-  return "agente";
+  return "agent";
 }
 
 }  // namespace apron::cli
 
 namespace {
 
-constexpr const char* kUsage = R"(apron — operar agentes e acompanhar projetos
+constexpr const char* kUsage = R"(apron — operate AI agents and follow projects
 
-  apron                         abre o Andamento no terminal
+  apron                         open the progress view in the terminal
 
-Execuções (docs/agent-protocol.md):
-  apron run start <tarefa> [--agent nome] [--intent "frase"] [--force]
-  apron run finish [--result done|failed|abandoned] "resumo"
+Runs (docs/agent-protocol.md):
+  apron run start <task> [--agent name] [--intent "sentence"] [--force]
+  apron run finish [--result done|failed|abandoned] "summary"
   apron run current
-  apron report step|ask|note "frase"
-  apron report blocked --cause gpu|budget|lock|machine|other "frase"
-  apron log [execução]          linha do tempo de uma execução (padrão: a atual ou a última)
-  apron runs                    todas as execuções do projeto
-  apron tasks [--prontas]       o plano do tasks.md, com o estado de cada tarefa
+  apron report step|ask|note "sentence"
+  apron report blocked --cause gpu|budget|lock|machine|other "sentence"
+  apron log [run]               timeline of a run (default: the current or the latest)
+  apron runs                    every run in the project
+  apron tasks [--ready]         the plan in tasks.md, with each task's state
 
-Variáveis: APRON_AGENT (nome do agente), APRON_MACHINE (nome da máquina), NO_COLOR.
+Environment: APRON_AGENT (agent name), APRON_MACHINE (machine name),
+APRON_LANG (en or pt-BR; default: system locale, then English), NO_COLOR.
 )";
 
 }  // namespace
@@ -80,7 +80,7 @@ int main(int argc, char** argv) {
   using namespace apron::cli;
   if (argc < 2) return cmd_ui(Args{});
   if (!std::strcmp(argv[1], "-h") || !std::strcmp(argv[1], "--help") || !std::strcmp(argv[1], "help")) {
-    std::fputs(kUsage, stdout);
+    std::fputs(apron::tr(kUsage).c_str(), stdout);
     return 0;
   }
   std::string cmd = argv[1];
@@ -88,10 +88,10 @@ int main(int argc, char** argv) {
   if (cmd == "report") return cmd_report(Args::parse(argc, argv, 2));
   if (cmd == "log") return cmd_log(Args::parse(argc, argv, 2));
   if (cmd == "runs") return cmd_runs(Args::parse(argc, argv, 2));
-  if (cmd == "tasks") return cmd_tasks(Args::parse(argc, argv, 2, {"prontas"}));
+  if (cmd == "tasks") return cmd_tasks(Args::parse(argc, argv, 2, {"ready", "prontas"}));
   if (cmd == "--version" || cmd == "version") {
     std::puts("apron 0.0.1");
     return 0;
   }
-  return fail("comando desconhecido: " + cmd + " (veja apron --help)");
+  return fail(apron::trf("unknown command: {} (see apron --help)", {cmd}));
 }

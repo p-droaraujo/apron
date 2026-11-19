@@ -1,5 +1,5 @@
-// Eventos de execução: a linguagem com que um agente conta o próprio trabalho.
-// Ver docs/agent-protocol.md, seção 4.
+// Run events: the language an agent uses to narrate its own work.
+// See docs/agent-protocol.md, section 4.
 #pragma once
 
 #include <cstdint>
@@ -30,13 +30,13 @@ struct Event {
   json::Value to_json() const;
   static std::optional<Event> from_json(const json::Value& value, std::string* error = nullptr);
 
-  // Atalho para campos extras em texto.
+  // Shortcut for text extra fields.
   std::string extra_str(std::string_view key) const;
   const json::Value* extra_find(std::string_view key) const;
 };
 
-// Uma linha JSON por evento. A escrita é um append único, seguro entre processos
-// para linhas curtas (POSIX garante atomicidade de O_APPEND até PIPE_BUF).
+// One JSON line per event. Each write is a single append, safe across processes
+// for short lines (POSIX makes O_APPEND writes up to PIPE_BUF atomic).
 bool append_event(const std::filesystem::path& file, const Event& event, std::string* error = nullptr);
 std::vector<Event> load_events(const std::filesystem::path& file, std::vector<std::string>* warnings = nullptr);
 

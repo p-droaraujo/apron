@@ -4,9 +4,10 @@
 #include <fstream>
 
 #include "core/events.hpp"
+#include "core/i18n.hpp"
 #include "core/time.hpp"
 #include "test.hpp"
-#include "tui/andamento.hpp"
+#include "tui/progress.hpp"
 #include "tui/screen.hpp"
 
 using namespace apron;
@@ -29,7 +30,7 @@ bool screen_has(const Screen& s, const std::string& text) {
 
 }  // namespace
 
-TEST("tela: o segundo quadro igual não envia nada") {
+TEST("screen: an identical second frame sends nothing") {
   Screen s;
   s.resize(20, 3);
   s.put(0, 0, "olá ◐", Style{});
@@ -39,17 +40,17 @@ TEST("tela: o segundo quadro igual não envia nada") {
   s.put(4, 0, "●", Style{});
   std::string diff = s.flush();
   CHECK(diff.find("●") != std::string::npos);
-  CHECK(diff.find("olá") == std::string::npos);  // só a célula que mudou
-  CHECK(diff.find("\x1b[?2026h") == 0);           // dentro da saída sincronizada
+  CHECK(diff.find("olá") == std::string::npos);  // only the changed cell
+  CHECK(diff.find("\x1b[?2026h") == 0);           // inside synchronized output
 }
 
-TEST("tela: largura e corte contam pontos de código, não bytes") {
+TEST("screen: width and clipping count code points, not bytes") {
   CHECK_EQ(text_width("decisão ◐"), 9);
   CHECK_EQ(fit("execução longa", 6), std::string("execu…"));
   CHECK_EQ(fit("curto", 10), std::string("curto"));
 }
 
-TEST("andamento: tarefas e execuções caem nas faixas certas") {
+TEST("progress: tasks and runs land in the right lanes") {
   fs::path root = fs::temp_directory_path() / ("apron-ui-" + std::to_string(::getpid()));
   fs::create_directories(root / ".apron");
   {
@@ -84,18 +85,23 @@ TEST("andamento: tarefas e execuções caem nas faixas certas") {
   append_event(p.run_file(e.run), e);
 
   Model m = load_model(p);
-  CHECK_EQ(m.lanes[0].size(), size_t(2));  // T2 pronta, T3 esperando T2
+  CHECK_EQ(m.lanes[0].size(), size_t(2));  // T2 ready, T3 waiting on T2
   CHECK(m.lanes[0][0].ready);
   CHECK_EQ(m.lanes[0][0].task, std::string("T2"));
-  CHECK_EQ(m.lanes[2].size(), size_t(1));  // T4 espera decisão
-  CHECK_EQ(m.lanes[3].size(), size_t(1));  // T1 feita
+  CHECK_EQ(m.lanes[2].size(), size_t(1));  // T4 waits for a decision
+  CHECK_EQ(m.lanes[3].size(), size_t(1));  // T1 done
   CHECK_EQ(m.waiting, 1);
 
   Screen s;
   s.resize(120, 20);
   View v;
-  render_andamento(s, m, v, timeutil::now_ms());
+  i18n::set(i18n::Lang::En);
+  render_progress(s, m, v, timeutil::now_ms());
+  CHECK(screen_has(s, "GATES 1"));
+  i18n::set(i18n::Lang::PtBr);
+  render_progress(s, m, v, timeutil::now_ms());
   CHECK(screen_has(s, "PORTÕES 1"));
+  i18n::set(i18n::Lang::En);
   CHECK(screen_has(s, "o schema pode mudar?"));
   CHECK(screen_has(s, "◐ 1"));
   fs::remove_all(root);

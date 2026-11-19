@@ -27,7 +27,7 @@ Apron's own plan, in the format described in `docs/agent-protocol.md`.
   done-when: with APRON_LANG=pt-BR everything shows in Portuguese, without it in English; tasks.md accepts keys in both languages
   checks: build, test
 
-- [ ] T3 `apron check` runs `checks.toml` and writes one event per check
+- [x] T3 `apron check` runs `checks.toml` and writes one event per check
   scope: src/**, tests/**
   depends: T1
   done-when: `apron check` shows each check with ok and duration and records them in the current run

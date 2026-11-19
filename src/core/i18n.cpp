@@ -85,6 +85,11 @@ const std::unordered_map<std::string_view, std::string_view>& pt_br() {
       {"no runs yet", "nenhuma execução ainda"},
       {"warning: skipped line in {}", "aviso: linha ignorada em {}"},
       {"warning: {}", "aviso: {}"},
+      {"checks.toml has no [[check]] with name and run", "o checks.toml não tem nenhum [[check]] com name e run"},
+      {"warning: no check named {} in checks.toml", "aviso: nenhum check chamado {} no checks.toml"},
+      {"timed out after {}s", "estourou o tempo de {}s"},
+      {"no run in progress: results were not recorded", "nenhuma execução em curso: os resultados não foram gravados"},
+      {"checks.toml line {}: expected key = value", "checks.toml linha {}: esperava chave = valor"},
 
       {R"(apron — operate AI agents and follow projects
 
@@ -97,6 +102,7 @@ Runs (docs/agent-protocol.md):
   apron report step|ask|note "sentence"
   apron report blocked --cause gpu|budget|lock|machine|other "sentence"
   apron log [run]               timeline of a run (default: the current or the latest)
+  apron check [names...]        run checks.toml and record the results in the current run
   apron runs                    every run in the project
   apron tasks [--ready]         the plan in tasks.md, with each task's state
 
@@ -114,6 +120,7 @@ Execuções (docs/agent-protocol.md):
   apron report step|ask|note "frase"
   apron report blocked --cause gpu|budget|lock|machine|other "frase"
   apron log [execução]          linha do tempo de uma execução (padrão: a atual ou a última)
+  apron check [nomes...]        roda o checks.toml e grava os resultados na execução atual
   apron runs                    todas as execuções do projeto
   apron tasks [--ready]         o plano do tasks.md, com o estado de cada tarefa
 

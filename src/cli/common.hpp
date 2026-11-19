@@ -54,6 +54,7 @@ int cmd_log(const Args& args);
 int cmd_runs(const Args& args);
 int cmd_tasks(const Args& args);
 int cmd_ui(const Args& args);
+int cmd_check(const Args& args);
 
 // Updates a task's state in tasks.md; false if the task is not there.
 bool sync_task(const Project& project, const std::string& id, char state, const std::string& by);

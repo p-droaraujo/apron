@@ -81,3 +81,23 @@ Apron's own plan, in the format described in `docs/agent-protocol.md`.
   depends: T5
   done-when: `apron hook <event>` reads Claude Code's JSON with the real parser; approving a permission prompt takes the card out of gates; the Stop nudge can be turned off; the hook tests run in ctest; this repository's own Claude Code sessions report through the hooks
   checks: build, test
+
+## v0b · Review
+
+- [ ] T14 Review tab: finished runs with trajectory, checks, scope and the diff, and the actions merge, return to the agent, discard
+  scope: CMakeLists.txt, src/tui/**, src/cli/**, src/core/**, tests/**, README.md
+  depends: T11, T4
+  done-when: `v` in the TUI opens a queue of finished runs, failing checks and scope drift first; Enter shows the instruments and the changed files; m merges the run's branch into main, r writes the person's comment as the run's next prompt note, d discards
+  checks: build, test
+
+- [ ] T15 Activity tab: one timeline of the events of every project on the machine
+  scope: CMakeLists.txt, src/tui/**, src/cli/**, src/core/**, tests/**
+  depends: T7, T11
+  done-when: `y` in the TUI shows the latest events of all projects aprond knows, newest first, and updates live
+  checks: build, test
+
+- [ ] T16 From a card to the agent's terminal: Enter on a running card attaches to its session
+  scope: CMakeLists.txt, src/tui/**, src/cli/**, tests/**
+  depends: T7, T11
+  done-when: Enter on a running card whose run recorded a session leaves the TUI, attaches to that session, and Ctrl-] comes back to the TUI
+  checks: build, test

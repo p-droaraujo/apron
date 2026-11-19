@@ -42,9 +42,20 @@ T2 · claude@nexus · 12m04s · ✓ feita
   12m04s  ■ terminou     done · parser and writer done; review the state markers first
 ```
 
+## Sessions that outlive your terminal
+
+`aprond` keeps terminal sessions alive on each machine; `apron` starts it on demand.
+
+```sh
+./build/apron new -d -- claude      # a session running an agent, in the background
+./build/apron ls                    # ● 1  claude   3m  ~/code/shop
+./build/apron attach 1              # take over its terminal; Ctrl-] detaches, the agent keeps going
+./build/apron kill 1
+```
+
 ## How it fits together
 
-- `aprond` — a daemon on each machine that owns terminals and agents (coming in T6).
+- `aprond` — a daemon on each machine that owns terminals and agents.
 - `aprond hub` — runs on an always-on machine, links all machines over Tailscale with mTLS (T8).
 - `apron` — the TUI, in any modern terminal (Ghostty recommended).
 

@@ -85,6 +85,19 @@ const std::unordered_map<std::string_view, std::string_view>& pt_br() {
       {"no runs yet", "nenhuma execução ainda"},
       {"warning: skipped line in {}", "aviso: linha ignorada em {}"},
       {"warning: {}", "aviso: {}"},
+      {"could not start aprond", "não consegui iniciar o aprond"},
+      {"aprond did not start; see {}", "o aprond não subiu; veja {}"},
+      {"aprond is not running", "o aprond não está rodando"},
+      {"lost the connection to aprond", "a conexão com o aprond caiu"},
+      {"aprond did not answer", "o aprond não respondeu"},
+      {"no session {}", "a sessão {} não existe"},
+      {"[attached; Ctrl-] detaches]", "[anexado; Ctrl-] desanexa]"},
+      {"[detached from session {}]", "[desanexado da sessão {}]"},
+      {"no sessions", "nenhuma sessão"},
+      {"exited", "encerrada"},
+      {"usage: apron attach <session>", "uso: apron attach <sessão>"},
+      {"usage: apron kill <session>", "uso: apron kill <sessão>"},
+      {"aprond is running on {}", "o aprond está rodando em {}"},
       {"warning: {} of {} files left the scope:", "aviso: {} de {} arquivos saíram do escopo:"},
       {"no run in progress; use apron scope <run>", "nenhuma execução em curso; use apron scope <execução>"},
       {"{} files, {} outside the scope", "{} arquivos, {} fora do escopo"},
@@ -98,6 +111,13 @@ const std::unordered_map<std::string_view, std::string_view>& pt_br() {
       {R"(apron — operate AI agents and follow projects
 
   apron                         open the progress view in the terminal
+
+Sessions (kept by aprond, started on demand):
+  apron new [-d] [command...]   new session in this directory, attached unless -d
+  apron ls                      sessions and the program in the foreground of each
+  apron attach <session>        attach this terminal; Ctrl-] detaches
+  apron kill <session>          end a session
+  apron daemon [stop]           is aprond running? stop it
 
 Runs (docs/agent-protocol.md):
   apron run start <task> [--agent name] [--intent "sentence"] [--force]
@@ -117,6 +137,13 @@ APRON_LANG (en or pt-BR; default: system locale, then English), NO_COLOR.
        R"(apron — operar agentes e acompanhar projetos
 
   apron                         abre o Andamento no terminal
+
+Sessões (mantidas pelo aprond, que sobe sozinho):
+  apron new [-d] [comando...]   nova sessão neste diretório, anexada a menos que -d
+  apron ls                      as sessões e o programa em primeiro plano de cada uma
+  apron attach <sessão>         anexa este terminal; Ctrl-] desanexa
+  apron kill <sessão>           encerra uma sessão
+  apron daemon [stop]           o aprond está rodando? pare-o
 
 Execuções (docs/agent-protocol.md):
   apron run start <tarefa> [--agent nome] [--intent "frase"] [--force]

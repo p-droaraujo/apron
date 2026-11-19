@@ -7,18 +7,28 @@ namespace apron::cli {
 
 Args Args::parse(int argc, char** argv, int from, const std::vector<std::string>& flags) {
   Args a;
+  auto is_flag = [&](const std::string& key) {
+    for (const auto& f : flags)
+      if (f == key) return true;
+    return false;
+  };
   for (int i = from; i < argc; ++i) {
     std::string s = argv[i];
+    if (s == "--") {  // everything after is positional, e.g. a command to run
+      for (++i; i < argc; ++i) a.pos.emplace_back(argv[i]);
+      break;
+    }
+    if (s.size() == 2 && s[0] == '-' && s[1] != '-' && is_flag(s.substr(1))) {  // -d
+      a.opt[s.substr(1)] = "1";
+      continue;
+    }
     if (s.rfind("--", 0) == 0 && s.size() > 2) {
       std::string key = s.substr(2);
       if (auto eq = key.find('='); eq != std::string::npos) {
         a.opt[key.substr(0, eq)] = key.substr(eq + 1);
         continue;
       }
-      bool is_flag = false;
-      for (const auto& f : flags)
-        if (f == key) is_flag = true;
-      if (is_flag || i + 1 >= argc) a.opt[key] = "1";
+      if (is_flag(key) || i + 1 >= argc) a.opt[key] = "1";
       else a.opt[key] = argv[++i];
     } else {
       a.pos.push_back(std::move(s));
@@ -60,6 +70,13 @@ constexpr const char* kUsage = R"(apron — operate AI agents and follow project
 
   apron                         open the progress view in the terminal
 
+Sessions (kept by aprond, started on demand):
+  apron new [-d] [command...]   new session in this directory, attached unless -d
+  apron ls                      sessions and the program in the foreground of each
+  apron attach <session>        attach this terminal; Ctrl-] detaches
+  apron kill <session>          end a session
+  apron daemon [stop]           is aprond running? stop it
+
 Runs (docs/agent-protocol.md):
   apron run start <task> [--agent name] [--intent "sentence"] [--force]
   apron run finish [--result done|failed|abandoned] "summary"
@@ -89,6 +106,8 @@ int main(int argc, char** argv) {
   if (cmd == "run") return cmd_run(Args::parse(argc, argv, 2, {"force"}));
   if (cmd == "report") return cmd_report(Args::parse(argc, argv, 2));
   if (cmd == "log") return cmd_log(Args::parse(argc, argv, 2));
+  if (cmd == "new" || cmd == "ls" || cmd == "attach" || cmd == "kill" || cmd == "daemon")
+    return cmd_sessions(cmd, Args::parse(argc, argv, 2, {"d", "detach"}));
   if (cmd == "scope") return cmd_scope(Args::parse(argc, argv, 2));
   if (cmd == "check") return cmd_check(Args::parse(argc, argv, 2));
   if (cmd == "runs") return cmd_runs(Args::parse(argc, argv, 2));

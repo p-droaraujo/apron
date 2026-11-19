@@ -45,7 +45,7 @@ Apron's own plan, in the format described in `docs/agent-protocol.md`.
   done-when: an example `.claude/settings.json` makes Claude Code emit step, ask and run.finished by itself
   checks: build, test
 
-- [ ] T6 Minimal `aprond`: unix socket, protocol frames, PTYs and `sessions.list`
+- [x] T6 Minimal `aprond`: unix socket, protocol frames, PTYs and `sessions.list`
   scope: CMakeLists.txt, src/daemon/**, src/proto/**, src/cli/**, tests/**
   depends: T1
   done-when: `aprond` starts, `apron new` creates a session and `apron ls` lists it with the foreground agent

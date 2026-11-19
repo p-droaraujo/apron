@@ -17,6 +17,7 @@ add_library(apron_core
   src/core/project.cpp
   src/core/time.cpp
   src/core/runs.cpp
+  src/core/tasks.cpp
 )
 target_include_directories(apron_core PUBLIC src)
 
@@ -25,10 +26,11 @@ add_executable(apron
   src/cli/cmd_run.cpp
   src/cli/cmd_report.cpp
   src/cli/cmd_log.cpp
+  src/cli/cmd_tasks.cpp
 )
 target_link_libraries(apron PRIVATE apron_core)
 
 enable_testing()
-add_executable(apron_tests tests/test_main.cpp tests/test_json.cpp tests/test_events.cpp)
+add_executable(apron_tests tests/test_main.cpp tests/test_json.cpp tests/test_events.cpp tests/test_tasks.cpp)
 target_link_libraries(apron_tests PRIVATE apron_core)
 add_test(NAME core COMMAND apron_tests)

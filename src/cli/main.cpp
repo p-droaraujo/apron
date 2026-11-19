@@ -60,13 +60,14 @@ namespace {
 constexpr const char* kUsage = R"(apron — operar agentes e acompanhar projetos
 
 Execuções (docs/agent-protocol.md):
-  apron run start <tarefa> [--agent nome] [--intent "frase"]
+  apron run start <tarefa> [--agent nome] [--intent "frase"] [--force]
   apron run finish [--result done|failed|abandoned] "resumo"
   apron run current
   apron report step|ask|note "frase"
   apron report blocked --cause gpu|budget|lock|machine|other "frase"
   apron log [execução]          linha do tempo de uma execução (padrão: a atual ou a última)
   apron runs                    todas as execuções do projeto
+  apron tasks [--prontas]       o plano do tasks.md, com o estado de cada tarefa
 
 Variáveis: APRON_AGENT (nome do agente), APRON_MACHINE (nome da máquina), NO_COLOR.
 )";
@@ -80,10 +81,11 @@ int main(int argc, char** argv) {
     return argc < 2 ? 1 : 0;
   }
   std::string cmd = argv[1];
-  if (cmd == "run") return cmd_run(Args::parse(argc, argv, 2));
+  if (cmd == "run") return cmd_run(Args::parse(argc, argv, 2, {"force"}));
   if (cmd == "report") return cmd_report(Args::parse(argc, argv, 2));
   if (cmd == "log") return cmd_log(Args::parse(argc, argv, 2));
   if (cmd == "runs") return cmd_runs(Args::parse(argc, argv, 2));
+  if (cmd == "tasks") return cmd_tasks(Args::parse(argc, argv, 2, {"prontas"}));
   if (cmd == "--version" || cmd == "version") {
     std::puts("apron 0.0.1");
     return 0;

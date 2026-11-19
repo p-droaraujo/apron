@@ -4,6 +4,7 @@
 #include "cli/common.hpp"
 #include "core/events.hpp"
 #include "core/runs.hpp"
+#include "core/tasks.hpp"
 #include "core/time.hpp"
 
 namespace apron::cli {
@@ -16,6 +17,21 @@ int run_start(const Args& args, const Project& project) {
     return fail("já existe uma execução em curso neste worktree (" + *current +
                 "); feche com apron run finish antes de começar outra");
   }
+  // O contrato mínimo: tarefa com escopo e pronto, dependências feitas.
+  const std::string& id = args.pos[1];
+  auto file = TaskFile::load(project.tasks_file());
+  const Task* task = file ? file->find(id) : nullptr;
+  if (task) {
+    auto why = blockers_to_start(*file, *task);
+    if (!why.empty() && !args.has("force")) {
+      std::string msg = "a tarefa " + id + " não pode ser pega:";
+      for (const auto& w : why) msg += "\n  - " + w;
+      return fail(msg + "\n(use --force para começar mesmo assim)");
+    }
+  } else {
+    std::fprintf(stderr, "aviso: %s não está no tasks.md; a execução fica avulsa\n", id.c_str());
+  }
+
   int64_t now = timeutil::now_ms();
   Event e;
   e.ts_ms = now;
@@ -30,6 +46,7 @@ int run_start(const Args& args, const Project& project) {
   std::string err;
   if (!append_event(project.run_file(e.run), e, &err)) return fail(err);
   project.set_current_run(e.run);
+  if (task) sync_task(project, id, '~', e.agent + "@" + e.machine);
   std::printf("%s\n", e.run.c_str());
   return 0;
 }
@@ -60,6 +77,7 @@ int run_finish(const Args& args, const Project& project) {
   std::string err;
   if (!append_event(project.run_file(run), e, &err)) return fail(err);
   if (project.current_run() == run) project.clear_current_run();
+  sync_task(project, first.task, result == "done" ? 'x' : result == "abandoned" ? '-' : ' ', "");
   return 0;
 }
 

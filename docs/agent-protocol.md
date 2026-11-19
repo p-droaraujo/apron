@@ -65,7 +65,10 @@ apron report blocked "..."              →  ⊘ sem energia, com a causa
 apron report note "..."                 →  aprendizado que vale para a próxima execução
 apron check                             →  roda os checks, um evento check por comando
 apron run finish --result done "..."    →  [x], resumo, entra na Revisão
+git commit (com Apron-Run: <id>)        →  o tasks.md e o código mudam juntos
 ```
+
+O commit vem depois do `finish`, porque o `finish` muda o estado no `tasks.md`. O trailer `Apron-Run` liga o commit à execução, e o corpo do commit leva o resumo: os eventos ficam fora do git, mas a história do trabalho não se perde no push.
 
 Cada comando grava um evento e devolve em menos de 10 ms. Nenhum deles bloqueia o agente.
 

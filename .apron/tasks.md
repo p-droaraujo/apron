@@ -9,7 +9,7 @@ O plano do próprio Apron, no formato descrito em `docs/agent-protocol.md`.
   pronto: uma execução iniciada, narrada e terminada pela CLI aparece inteira em `apron log`
   checks: build, test
 
-- [ ] T2 O `tasks.md` é lido e atualizado pela CLI (`apron tasks`, estados `[~]`, `[?]`, `[x]`)
+- [x] T2 O `tasks.md` é lido e atualizado pela CLI (`apron tasks`, estados `[~]`, `[?]`, `[x]`)
   escopo: src/**, tests/**
   depende: T1
   pronto: `apron run start T2` recusa tarefa sem escopo ou pronto e marca `[~]` com `por:`

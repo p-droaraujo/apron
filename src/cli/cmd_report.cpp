@@ -1,6 +1,7 @@
 // apron report step|ask|blocked|note "frase"
 #include "cli/common.hpp"
 #include "core/events.hpp"
+#include "core/tasks.hpp"
 #include "core/time.hpp"
 
 namespace apron::cli {
@@ -42,6 +43,13 @@ int cmd_report(const Args& args) {
   }
   std::string err;
   if (!append_event(project->run_file(run), e, &err)) return fail(err);
+  // Uma pergunta põe a tarefa em [?]; o próximo passo a devolve para [~].
+  std::string por = e.agent + "@" + e.machine;
+  if (*kind == Kind::Ask) sync_task(*project, e.task, '?', por);
+  else if (*kind == Kind::Step) {
+    if (auto file = TaskFile::load(project->tasks_file()); file && file->find(e.task) && file->find(e.task)->state == '?')
+      sync_task(*project, e.task, '~', por);
+  }
   return 0;
 }
 

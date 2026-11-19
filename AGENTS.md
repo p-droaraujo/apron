@@ -19,7 +19,7 @@ Este repositório é gerenciado pelo Apron, e o Apron é construído com ele mes
 ## Ao terminar
 
 1. Rode os checks: `./build/apron check`.
-2. Faça o commit no branch da tarefa.
-3. Feche a execução: `./build/apron run finish --result done "<o que foi feito; o que ficou de fora; o que olhar primeiro>"`.
+2. Feche a execução: `./build/apron run finish --result done "<o que foi feito; o que ficou de fora; o que olhar primeiro>"`. Isso marca a tarefa `[x]` no `tasks.md`.
+3. Faça o commit no branch da tarefa, com o `tasks.md` junto e o trailer `Apron-Run: <id da execução>`.
 
 Uma frase por evento, no presente, dizendo o que mudou. O Apron mede sozinho arquivos, tempo e custo: não reporte isso.

@@ -36,7 +36,7 @@ target_include_directories(apron_core PUBLIC src)
 add_library(apron_proto src/proto/frame.cpp src/proto/socket.cpp)
 target_include_directories(apron_proto PUBLIC src)
 
-add_executable(aprond src/daemon/main.cpp src/daemon/server.cpp src/daemon/session.cpp)
+add_executable(aprond src/daemon/main.cpp src/daemon/server.cpp src/daemon/session.cpp src/daemon/registry.cpp)
 target_link_libraries(aprond PRIVATE apron_core apron_proto)
 if(NOT APPLE)
   target_link_libraries(aprond PRIVATE util)  # forkpty
@@ -52,12 +52,13 @@ add_executable(apron
   src/cli/cmd_check.cpp
   src/cli/cmd_scope.cpp
   src/cli/cmd_sessions.cpp
+  src/cli/cmd_projects.cpp
   src/cli/daemon_client.cpp
 )
 target_link_libraries(apron PRIVATE apron_tui apron_proto)
 
 enable_testing()
-add_executable(apron_tests tests/test_main.cpp tests/test_json.cpp tests/test_events.cpp tests/test_tasks.cpp tests/test_tui.cpp tests/test_i18n.cpp tests/test_checks.cpp tests/test_scope.cpp tests/test_daemon.cpp)
+add_executable(apron_tests tests/test_main.cpp tests/test_json.cpp tests/test_events.cpp tests/test_tasks.cpp tests/test_tui.cpp tests/test_i18n.cpp tests/test_checks.cpp tests/test_scope.cpp tests/test_daemon.cpp tests/test_cli.cpp)
 target_link_libraries(apron_tests PRIVATE apron_tui apron_proto)
 add_dependencies(apron_tests aprond apron)
 target_compile_definitions(apron_tests PRIVATE APRON_SOURCE_DIR="${CMAKE_SOURCE_DIR}" APRON_BINARY_DIR="${CMAKE_BINARY_DIR}")

@@ -16,6 +16,7 @@
 
 #include "core/json.hpp"
 #include "core/project.hpp"
+#include "daemon/registry.hpp"
 #include "daemon/session.hpp"
 #include "proto/frame.hpp"
 #include "proto/socket.hpp"
@@ -36,15 +37,17 @@ struct Client {
   int fd = -1;
   proto::Reader reader;
   std::set<uint32_t> attached;
+  bool subscribed = false;  // receives every event pushed to the daemon
 };
 
 class Server {
  public:
-  explicit Server(int listen_fd) : listen_fd_(listen_fd) {}
+  Server(int listen_fd, Registry registry) : listen_fd_(listen_fd), registry_(std::move(registry)) {}
   int run();
 
  private:
   int listen_fd_;
+  Registry registry_;
   bool stopping_ = false;
   uint32_t next_id_ = 1;
   std::map<uint32_t, std::unique_ptr<Session>> sessions_;
@@ -201,6 +204,27 @@ void Server::handle_ctrl(Client& c, const std::string& payload) {
       if (!s.alive()) sessions_.erase(it);
       reply(c, *req, {});
     }
+  } else if (cmd == "events.push") {
+    // A CLI recorded an event in a project's files: learn the project and
+    // pass the event on to whoever is watching. No reply: fire and forget.
+    std::string root = req->get_str("root");
+    if (!root.empty()) registry_.add(root);
+    if (const json::Value* ev = req->find("event")) {
+      json::Object out;
+      out.emplace_back("event", "run.event");
+      out.emplace_back("root", root);
+      out.emplace_back("data", *ev);
+      std::string payload = json::dump(json::Value(std::move(out)));
+      for (auto& other : clients_)
+        if (other->subscribed) send(*other, proto::Type::Ctrl, 0, payload);
+    }
+  } else if (cmd == "events.subscribe") {
+    c.subscribed = true;
+    reply(c, *req, {});
+  } else if (cmd == "projects.list") {
+    json::Object b;
+    b.emplace_back("projects", registry_.list());
+    reply(c, *req, std::move(b));
   } else if (cmd == "daemon.stop") {
     reply(c, *req, {});
     stopping_ = true;
@@ -255,7 +279,7 @@ int serve(const std::filesystem::path& socket) {
     std::fprintf(stderr, "aprond: cannot listen on %s: %s\n", socket.c_str(), err.c_str());
     return 1;
   }
-  Server server(fd);
+  Server server(fd, Registry(Registry::default_file()));
   int rc = server.run();
   close(fd);
   unlink(socket.c_str());

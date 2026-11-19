@@ -85,6 +85,9 @@ const std::unordered_map<std::string_view, std::string_view>& pt_br() {
       {"no runs yet", "nenhuma execução ainda"},
       {"warning: skipped line in {}", "aviso: linha ignorada em {}"},
       {"warning: {}", "aviso: {}"},
+      {"aprond is not running; projects show up here once a run reports while it runs",
+       "o aprond não está rodando; os projetos aparecem aqui quando uma execução reporta com ele no ar"},
+      {"no projects yet", "nenhum projeto ainda"},
       {"could not start aprond", "não consegui iniciar o aprond"},
       {"aprond did not start; see {}", "o aprond não subiu; veja {}"},
       {"aprond is not running", "o aprond não está rodando"},
@@ -118,6 +121,7 @@ Sessions (kept by aprond, started on demand):
   apron attach <session>        attach this terminal; Ctrl-] detaches
   apron kill <session>          end a session
   apron daemon [stop]           is aprond running? stop it
+  apron projects                every project on this machine, with its runs
 
 Runs (docs/agent-protocol.md):
   apron run start <task> [--agent name] [--intent "sentence"] [--force]
@@ -144,6 +148,7 @@ Sessões (mantidas pelo aprond, que sobe sozinho):
   apron attach <sessão>         anexa este terminal; Ctrl-] desanexa
   apron kill <sessão>           encerra uma sessão
   apron daemon [stop]           o aprond está rodando? pare-o
+  apron projects                todos os projetos desta máquina, com as execuções
 
 Execuções (docs/agent-protocol.md):
   apron run start <tarefa> [--agent nome] [--intent "frase"] [--force]

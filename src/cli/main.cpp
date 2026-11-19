@@ -76,6 +76,7 @@ Sessions (kept by aprond, started on demand):
   apron attach <session>        attach this terminal; Ctrl-] detaches
   apron kill <session>          end a session
   apron daemon [stop]           is aprond running? stop it
+  apron projects                every project on this machine, with its runs
 
 Runs (docs/agent-protocol.md):
   apron run start <task> [--agent name] [--intent "sentence"] [--force]
@@ -108,6 +109,7 @@ int main(int argc, char** argv) {
   if (cmd == "log") return cmd_log(Args::parse(argc, argv, 2));
   if (cmd == "new" || cmd == "ls" || cmd == "attach" || cmd == "kill" || cmd == "daemon")
     return cmd_sessions(cmd, Args::parse(argc, argv, 2, {"d", "detach"}));
+  if (cmd == "projects") return cmd_projects(Args::parse(argc, argv, 2));
   if (cmd == "scope") return cmd_scope(Args::parse(argc, argv, 2));
   if (cmd == "check") return cmd_check(Args::parse(argc, argv, 2));
   if (cmd == "runs") return cmd_runs(Args::parse(argc, argv, 2));

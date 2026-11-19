@@ -42,7 +42,7 @@ int cmd_report(const Args& args) {
     e.extra.emplace_back("cause", cause);
   }
   std::string err;
-  if (!append_event(project->run_file(run), e, &err)) return fail(err);
+  if (!record(*project, e, &err)) return fail(err);
   // An ask moves the task to [?]; the next step moves it back to [~].
   std::string by = e.agent + "@" + e.machine;
   if (*kind == Kind::Ask) sync_task(*project, e.task, '?', by);

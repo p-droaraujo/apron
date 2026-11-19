@@ -85,7 +85,8 @@ int cmd_check(const Args& args) {
       e.extra.emplace_back("ok", r.ok);
       e.extra.emplace_back("ms", static_cast<long long>(r.ms));
       if (!r.ok) e.extra.emplace_back("exit", r.exit_code);
-      append_event(project->run_file(*current), e);
+      std::string ignored;
+      record(*project, e, &ignored);
     }
   }
   if (!current) std::printf("%s\n", st.dim(tr("no run in progress: results were not recorded")).c_str());

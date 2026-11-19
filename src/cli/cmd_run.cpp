@@ -45,9 +45,11 @@ int run_start(const Args& args, const Project& project) {
   if (!intent.empty()) e.extra.emplace_back("intent", intent);
   // The commit the run starts from: the scope meter diffs against it.
   if (auto head = git_head(project.root)) e.extra.emplace_back("base", *head);
+  // Inside an apron session, the run remembers which one: the agent's terminal.
+  if (const char* session = std::getenv("APRON_SESSION"); session && *session) e.extra.emplace_back("session", std::string(session));
 
   std::string err;
-  if (!append_event(project.run_file(e.run), e, &err)) return fail(err);
+  if (!record(project, e, &err)) return fail(err);
   project.set_current_run(e.run);
   if (task) sync_task(project, id, '~', e.agent + "@" + e.machine);
   std::printf("%s\n", e.run.c_str());
@@ -109,7 +111,7 @@ int run_finish(const Args& args, const Project& project) {
     for (const auto& f : scope.outside) std::fprintf(stderr, "  %s\n", f.c_str());
   }
   std::string err;
-  if (!append_event(project.run_file(run), e, &err)) return fail(err);
+  if (!record(project, e, &err)) return fail(err);
   if (project.current_run() == run) project.clear_current_run();
   sync_task(project, first.task, result == "done" ? 'x' : result == "abandoned" ? '-' : ' ', "");
   return 0;

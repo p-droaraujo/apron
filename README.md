@@ -51,6 +51,7 @@ T2 · claude@nexus · 12m04s · ✓ feita
 ./build/apron ls                    # ● 1  claude   3m  ~/code/shop
 ./build/apron attach 1              # take over its terminal; Ctrl-] detaches, the agent keeps going
 ./build/apron kill 1
+./build/apron projects              # every project on this machine, with its runs
 ```
 
 ## How it fits together

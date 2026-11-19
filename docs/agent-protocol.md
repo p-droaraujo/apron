@@ -74,6 +74,10 @@ The commit comes after `finish`, because `finish` changes the state in `tasks.md
 
 Every command writes one event and returns in under 10 ms. None of them blocks the agent.
 
+The file in `.apron/runs/` is always the source. If the machine's `aprond` is running, the CLI also tells it about the event, without waiting for an answer; that is how the daemon knows every project on the machine (`apron projects`). With the daemon down, nothing is lost.
+
+A run started inside an `apron` session records the session (`session` in `run.started`), so the run and the agent's terminal can be found from each other.
+
 ## 4. Events
 
 One JSON line per event in `.apron/runs/<run>.jsonl`:
@@ -84,7 +88,7 @@ One JSON line per event in `.apron/runs/<run>.jsonl`:
 
 | `kind` | When | Extra fields | Shows up as |
 | --- | --- | --- | --- |
-| `run.started` | On picking up a task | `intent` | A card in Running, ● |
+| `run.started` | On picking up a task | `intent`, `base` (commit), `session` (if inside one) | A card in Running, ● |
 | `step` | On changing work phase | — | A point on the trajectory |
 | `ask` | A decision is needed | — | ◐ and a card in Gates |
 | `blocked` | Something outside stops progress | `cause` (gpu, budget, lock, machine, other) | ⊘ with the cause |
@@ -115,7 +119,7 @@ Writing rules for the agent:
 
 The agent reports none of this; Apron takes it from git, telemetry and the clock:
 
-- files and lines changed, and what left the `scope`;
+- files and lines changed, and what left the `scope` (`.apron/tasks.md` never counts: Apron itself writes the task state there);
 - duration of the run and of each step;
 - tokens and cost (OpenTelemetry) or GPU time (local model);
 - check results, when they run through `apron check`.

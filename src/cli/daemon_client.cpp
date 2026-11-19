@@ -16,6 +16,7 @@
 #include <mach-o/dyld.h>
 #endif
 
+#include "cli/common.hpp"
 #include "core/i18n.hpp"
 #include "proto/socket.hpp"
 
@@ -42,6 +43,19 @@ std::string aprond_path() {
 }
 
 }  // namespace
+
+bool record(const Project& project, const Event& event, std::string* error) {
+  if (!append_event(project.run_file(event.run), event, error)) return false;
+  int fd = proto::connect_unix(proto::socket_path());
+  if (fd < 0) return true;  // no daemon: the file is enough
+  json::Object notice;
+  notice.emplace_back("cmd", "events.push");
+  notice.emplace_back("root", project.root.string());
+  notice.emplace_back("event", event.to_json());
+  proto::write_all(fd, proto::encode({proto::Type::Ctrl, 0, json::dump(json::Value(std::move(notice)))}));
+  close(fd);
+  return true;
+}
 
 DaemonClient::~DaemonClient() {
   if (fd_ >= 0) close(fd_);

@@ -59,9 +59,14 @@ int cmd_ui(const Args& args);
 int cmd_check(const Args& args);
 int cmd_scope(const Args& args);
 int cmd_sessions(const std::string& cmd, const Args& args);
+int cmd_projects(const Args& args);
 
 // Files a run touched since its base commit, checked against the task's scope.
 ScopeReport measure_scope(const Project& project, const std::vector<Event>& events);
+
+// Records an event: appends it to the run's file (the source of truth), then
+// tells the local aprond, if it is running. Never waits for the daemon.
+bool record(const Project& project, const Event& event, std::string* error);
 
 // Updates a task's state in tasks.md; false if the task is not there.
 bool sync_task(const Project& project, const std::string& id, char state, const std::string& by);

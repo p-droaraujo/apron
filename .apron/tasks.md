@@ -46,7 +46,7 @@ Apron's own plan, in the format described in `docs/agent-protocol.md`.
   checks: build, test
 
 - [ ] T6 Minimal `aprond`: unix socket, protocol frames, PTYs and `sessions.list`
-  scope: src/daemon/**, src/proto/**, tests/**
+  scope: CMakeLists.txt, src/daemon/**, src/proto/**, src/cli/**, tests/**
   depends: T1
   done-when: `aprond` starts, `apron new` creates a session and `apron ls` lists it with the foreground agent
   checks: build, test

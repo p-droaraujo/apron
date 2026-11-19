@@ -1,4 +1,19 @@
 cmake_minimum_required(VERSION 3.25)
+
+# On macOS, CMake sometimes does not find the SDK (seen with AppleClang 21 and
+# the Command Line Tools), and then not even <string> is found. Ask xcrun for
+# it before project(), unless it was given explicitly.
+if(NOT DEFINED CMAKE_OSX_SYSROOT AND NOT DEFINED ENV{SDKROOT})
+  find_program(APRON_XCRUN xcrun)
+  if(APRON_XCRUN)
+    execute_process(COMMAND ${APRON_XCRUN} --show-sdk-path
+                    OUTPUT_VARIABLE APRON_SDK OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
+    if(APRON_SDK)
+      set(CMAKE_OSX_SYSROOT "${APRON_SDK}" CACHE PATH "macOS SDK")
+    endif()
+  endif()
+endif()
+
 project(apron VERSION 0.0.1 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)

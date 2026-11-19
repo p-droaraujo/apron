@@ -75,3 +75,9 @@ Apron's own plan, in the format described in `docs/agent-protocol.md`.
   depends: T7, T9, T11
   done-when: the progress view shows the runs of every project and machine with the agent states
   checks: build, test
+
+- [ ] T13 Claude Code hooks, second pass: a C++ `apron hook` instead of sed, the stuck ◐ after a permission prompt, and the hooks on in this repository
+  scope: CMakeLists.txt, src/cli/**, src/core/i18n.cpp, tests/**, integrations/claude-code/**, .claude/settings.json, docs/agent-protocol.md, README.md
+  depends: T5
+  done-when: `apron hook <event>` reads Claude Code's JSON with the real parser; approving a permission prompt takes the card out of gates; the Stop nudge can be turned off; the hook tests run in ctest; this repository's own Claude Code sessions report through the hooks
+  checks: build, test

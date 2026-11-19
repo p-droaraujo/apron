@@ -102,6 +102,7 @@ Writing rules for the agent:
 - Write in the project's language (`language` in `project.toml`).
 - A `step` on each change of phase (read, plan, edit, test, fix), not on each command. Three to ten per run.
 - `ask` only for what is a person's decision: business rules, anything customer-facing, architecture, scope. Technical doubts the agent solves itself.
+- If staying inside the `scope` forces a worse design, that is an `ask` too: say which better design needs which extra paths, and let the person choose.
 - The `run.finished` summary answers three questions: what was done, what was left out, and what the person should look at first.
 
 ## 5. How each agent connects

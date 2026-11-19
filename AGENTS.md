@@ -14,7 +14,7 @@ This repository is managed by Apron, and Apron is built with itself. Follow the 
 - Need a decision from the person (business rules, customer-facing, architecture, scope)? `./build/apron report ask "<the question>"` and wait.
 - Something outside stops you? `./build/apron report blocked --cause <gpu|budget|lock|machine|other> "<the reason>"`.
 - Learned something the next run should know? `./build/apron report note "<the lesson>"`.
-- Stay inside the task's `scope`. Need to leave it? That is an `ask`.
+- Stay inside the task's `scope`. Need to leave it, or would staying inside force a worse design? That is an `ask`.
 - Write events in English, the language of this project.
 
 ## When you finish

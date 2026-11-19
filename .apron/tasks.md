@@ -15,6 +15,12 @@ O plano do próprio Apron, no formato descrito em `docs/agent-protocol.md`.
   pronto: `apron run start T2` recusa tarefa sem escopo ou pronto e marca `[~]` com `por:`
   checks: build, test
 
+- [ ] T11 TUI do Andamento local e somente leitura: `apron` sem argumentos abre a tela
+  escopo: CMakeLists.txt, src/tui/**, src/cli/**, tests/**, README.md
+  depende: T2
+  pronto: `apron` mostra as faixas plano, executando, portões e feito a partir do tasks.md e dos eventos, atualiza sozinho e abre o log de uma execução
+  checks: build, test
+
 - [ ] T3 `apron check` roda o `checks.toml` e grava um evento por check
   escopo: src/**, tests/**
   depende: T1
@@ -60,6 +66,6 @@ O plano do próprio Apron, no formato descrito em `docs/agent-protocol.md`.
 
 - [ ] T10 Andamento na TUI a partir dos eventos
   escopo: src/tui/**, tests/**
-  depende: T7, T9
+  depende: T7, T9, T11
   pronto: o Andamento mostra as execuções de todos os projetos com os estados de agente
   checks: build, test

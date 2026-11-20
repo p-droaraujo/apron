@@ -47,14 +47,15 @@ add_library(apron_core
 )
 
 # libghostty-vt (D5): the terminal emulation behind Focus and Grid. The build
-# fetches Ghostty at a pinned commit and runs zig on it, so zig must be on the
-# PATH (see CONTRIBUTING.md for the version). FETCHCONTENT_SOURCE_DIR_GHOSTTY
+# fetches the libghostty-vt release vt-1.0.1 and runs zig on it, so zig 0.17
+# must be on the PATH (`brew install zig`). Moving to a newer release is how
+# Apron follows the Zig that Homebrew ships. FETCHCONTENT_SOURCE_DIR_GHOSTTY
 # points at a local checkout instead.
 include(FetchContent)
 set(GHOSTTY_ZIG_BUILD_FLAGS "-Dapp-runtime=none;-Demit-xcframework=false" CACHE STRING "" FORCE)
 FetchContent_Declare(ghostty
   GIT_REPOSITORY https://github.com/ghostty-org/ghostty.git
-  GIT_TAG f64f4aca2c29b554d111b36c3d946a9bddd159ff
+  GIT_TAG 108cacb17ed8990840cd14abfce43d8ed8503ca1  # vt-1.0.1
 )
 FetchContent_MakeAvailable(ghostty)
 

@@ -27,9 +27,9 @@ Apron is early. It works, and it is built with itself, but expect rough edges an
 
 ## Install
 
-You need a C++20 compiler (GCC 13 or Clang 16 and later), CMake 3.25 or later, Ninja and Zig 0.16. On a Mac: `xcode-select --install` and `brew install cmake ninja zig`.
+You need a C++20 compiler (GCC 13 or Clang 16 and later), CMake 3.25 or later, Ninja and Zig 0.17. On a Mac: `xcode-select --install` and `brew install cmake ninja zig`.
 
-The agents' terminals are drawn with [libghostty-vt](https://github.com/ghostty-org/ghostty), the terminal core of Ghostty. The build fetches it at a pinned commit and compiles it with Zig; the first build takes a few minutes.
+The agents' terminals are drawn with [libghostty-vt](https://github.com/ghostty-org/ghostty), the terminal core of Ghostty. The build fetches its release vt-1.0.1 and compiles it with Zig; the first build takes a few minutes.
 
 ```sh
 git clone https://github.com/p-droaraujo/apron && cd apron

@@ -79,11 +79,15 @@ Vt::Vt(int cols, int rows) : impl_(new Impl), cols_(std::max(1, cols)), rows_(st
   impl_->rows_n = static_cast<uint16_t>(rows_);
   ghostty_terminal_new(nullptr, &impl_->term, impl_->cols, impl_->rows_n);
   ghostty_terminal_set(impl_->term, GHOSTTY_TERMINAL_OPT_USERDATA, impl_);
-  ghostty_terminal_set(impl_->term, GHOSTTY_TERMINAL_OPT_WRITE_PTY, reinterpret_cast<const void*>(&Impl::write_pty));
-  ghostty_terminal_set(impl_->term, GHOSTTY_TERMINAL_OPT_SIZE, reinterpret_cast<const void*>(&Impl::size));
-  ghostty_terminal_set(impl_->term, GHOSTTY_TERMINAL_OPT_DEVICE_ATTRIBUTES,
-                       reinterpret_cast<const void*>(&Impl::device_attributes));
-  ghostty_terminal_set(impl_->term, GHOSTTY_TERMINAL_OPT_XTVERSION, reinterpret_cast<const void*>(&Impl::xtversion));
+  // Typed first, so a change in a callback's signature fails to compile.
+  GhosttyTerminalWritePtyFn write_pty = &Impl::write_pty;
+  GhosttyTerminalSizeFn size = &Impl::size;
+  GhosttyTerminalDeviceAttributesFn device_attributes = &Impl::device_attributes;
+  GhosttyTerminalXtversionFn xtversion = &Impl::xtversion;
+  ghostty_terminal_set(impl_->term, GHOSTTY_TERMINAL_OPT_WRITE_PTY, reinterpret_cast<const void*>(write_pty));
+  ghostty_terminal_set(impl_->term, GHOSTTY_TERMINAL_OPT_SIZE, reinterpret_cast<const void*>(size));
+  ghostty_terminal_set(impl_->term, GHOSTTY_TERMINAL_OPT_DEVICE_ATTRIBUTES, reinterpret_cast<const void*>(device_attributes));
+  ghostty_terminal_set(impl_->term, GHOSTTY_TERMINAL_OPT_XTVERSION, reinterpret_cast<const void*>(xtversion));
   size_t scrollback = 0;  // the daemon keeps the history; a pane shows the screen
   ghostty_terminal_set(impl_->term, GHOSTTY_TERMINAL_OPT_SCROLLBACK_MAX_LINES, &scrollback);
   ghostty_render_state_new(nullptr, &impl_->state);
@@ -127,7 +131,7 @@ void Vt::sync() const {
   if (ghostty_render_state_update(m.state, m.term) != GHOSTTY_SUCCESS) return;
 
   GhosttyRenderStateColors colors = GHOSTTY_INIT_SIZED(GhosttyRenderStateColors);
-  if (ghostty_render_state_colors_get(m.state, &colors) == GHOSTTY_SUCCESS) {
+  if (ghostty_render_state_get(m.state, GHOSTTY_RENDER_STATE_DATA_COLORS, &colors) == GHOSTTY_SUCCESS) {
     m.default_fg = rgb(colors.foreground);
     m.default_bg = rgb(colors.background);
   }
@@ -145,7 +149,7 @@ void Vt::sync() const {
       ++x;
 
       GhosttyCell raw{};
-      uint32_t wide = GHOSTTY_CELL_WIDE_NARROW;
+      GhosttyCellWide wide = GHOSTTY_CELL_WIDE_NARROW;
       if (ghostty_render_state_row_cells_get(m.cells, GHOSTTY_RENDER_STATE_ROW_CELLS_DATA_RAW, &raw) == GHOSTTY_SUCCESS)
         ghostty_cell_get(raw, GHOSTTY_CELL_DATA_WIDE, &wide);
       if (wide == GHOSTTY_CELL_WIDE_SPACER_TAIL) {
@@ -153,13 +157,13 @@ void Vt::sync() const {
         continue;
       }
 
-      uint32_t len = 0;
-      ghostty_render_state_row_cells_get(m.cells, GHOSTTY_RENDER_STATE_ROW_CELLS_DATA_GRAPHEMES_LEN, &len);
-      if (len > 0) {
-        uint32_t cps[16];
-        ghostty_render_state_row_cells_get(m.cells, GHOSTTY_RENDER_STATE_ROW_CELLS_DATA_GRAPHEMES_BUF, cps);
+      uint32_t cps[16];
+      GhosttyCodepointBuffer graphemes{cps, 16, 0};
+      GhosttyResult got =
+          ghostty_render_state_row_cells_get(m.cells, GHOSTTY_RENDER_STATE_ROW_CELLS_DATA_GRAPHEMES_BUF, &graphemes);
+      if ((got == GHOSTTY_SUCCESS || got == GHOSTTY_OUT_OF_SPACE) && graphemes.len > 0) {
         out.ch.clear();
-        for (uint32_t i = 0; i < std::min<uint32_t>(len, 16); ++i) out.ch += utf8(cps[i]);
+        for (size_t i = 0; i < std::min<size_t>(graphemes.len, 16); ++i) out.ch += utf8(cps[i]);
       }
 
       // Colors come resolved to RGB; a cell without one keeps the
@@ -169,16 +173,16 @@ void Vt::sync() const {
         out.style.fg = Color::hex(rgb(c));
       if (ghostty_render_state_row_cells_get(m.cells, GHOSTTY_RENDER_STATE_ROW_CELLS_DATA_BG_COLOR, &c) == GHOSTTY_SUCCESS)
         out.style.bg = Color::hex(rgb(c));
-      GhosttyStyle style = GHOSTTY_INIT_SIZED(GhosttyStyle);
+      GhosttyStyle style{};
       if (ghostty_render_state_row_cells_get(m.cells, GHOSTTY_RENDER_STATE_ROW_CELLS_DATA_STYLE, &style) == GHOSTTY_SUCCESS) {
-        out.style.bold = style.bold;
-        if (style.inverse) {
+        out.style.bold = style.flags & GHOSTTY_STYLE_FLAG_BOLD;
+        if (style.flags & GHOSTTY_STYLE_FLAG_INVERSE) {
           Color fg = out.style.fg.set ? out.style.fg : Color::hex(m.default_fg);
           Color bg = out.style.bg.set ? out.style.bg : Color::hex(m.default_bg);
           out.style.fg = bg;
           out.style.bg = fg;
         }
-        if (style.invisible) out.ch = " ";
+        if (style.flags & GHOSTTY_STYLE_FLAG_INVISIBLE) out.ch = " ";
       }
     }
     ++y;
@@ -220,7 +224,7 @@ bool Vt::cursor_visible() const {
 
 bool Vt::app_cursor() const {
   GhosttyTerminalModeConfig mode{};
-  mode.mode = GHOSTTY_MODE_DECCKM;
+  mode.mode = GHOSTTY_MODE_CURSOR_KEYS;
   if (ghostty_terminal_get(impl_->term, GHOSTTY_TERMINAL_DATA_MODE, &mode) != GHOSTTY_SUCCESS) return false;
   return mode.value;
 }

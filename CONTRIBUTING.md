@@ -19,7 +19,7 @@ Agents and people follow the same rules; [`AGENTS.md`](AGENTS.md) is the short v
 
 ## Code
 
-- C++20 with the standard library. The one dependency is libghostty-vt, which draws the agents' terminals; the build fetches it and needs Zig 0.16 on the PATH. A new dependency needs a decision in the architecture log first. Code, comments and commit messages in English.
+- C++20 with the standard library. The one dependency is libghostty-vt, which draws the agents' terminals; the build fetches it and needs Zig 0.17 on the PATH. A new dependency needs a decision in the architecture log first. Code, comments and commit messages in English.
 - Every string the interface shows goes through `tr()` or `trf()`, with its Portuguese entry in `src/core/i18n.cpp`; a test fails if one is missing.
 - `cmake -S . -B build -G Ninja && cmake --build build && ctest --test-dir build` must pass. Sanitizer builds (`-fsanitize=address,undefined`) should stay clean.
 - Prefer deleting to adding: a new option, file or command needs a reason that a person will feel.

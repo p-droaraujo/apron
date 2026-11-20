@@ -114,6 +114,12 @@ See every agent on one screen and reach the right terminal in one keystroke.
   done-when: a third view shows one tile per live session of every machine, updating as they write, and Enter or a click opens the tile in Focus
   checks: build, test
 
+- [x] T34 Build with the Zig that Homebrew ships: libghostty-vt pinned to its release vt-1.0.1 (Zig 0.17), vt.cpp on the 1.0 C API
+  scope: src/tui/vt.cpp, CMakeLists.txt, README.md, CONTRIBUTING.md, AGENTS.md
+  depends: T33
+  done-when: `brew install zig` is enough to build on a Mac; vt.cpp compiles against the vt-1.0.1 headers with every callback type-checked
+  checks: build, test
+
 - [x] T33 Agent terminals through libghostty-vt, as D5 decided: Focus and Grid draw what libghostty-vt parses; our own emulator goes away
   scope: src/tui/**, src/cli/**, tests/**, CMakeLists.txt, README.md, CONTRIBUTING.md, AGENTS.md, docs/**
   depends: T32

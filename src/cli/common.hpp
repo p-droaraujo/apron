@@ -62,6 +62,8 @@ int cmd_sessions(const std::string& cmd, const Args& args);
 int cmd_projects(const Args& args);
 int cmd_hook(const Args& args);
 int cmd_review(const Args& args);
+int cmd_machines(const Args& args);
+int cmd_proxy(const Args& args);
 
 // Attaches this terminal to a session of the local aprond until Ctrl-] or exit.
 int attach_session(uint32_t id);

@@ -37,6 +37,7 @@ add_library(apron_core
   src/core/checks.cpp
   src/core/scope.cpp
   src/core/review.cpp
+  src/core/activity.cpp
 )
 
 # The TUI: terminal, cell grid and the progress view.
@@ -71,6 +72,7 @@ add_executable(apron
   src/cli/cmd_projects.cpp
   src/cli/cmd_hook.cpp
   src/cli/cmd_review.cpp
+  src/cli/cmd_machines.cpp
   src/cli/daemon_client.cpp
 )
 target_link_libraries(apron PRIVATE apron_tui apron_proto)

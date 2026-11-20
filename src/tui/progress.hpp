@@ -1,6 +1,8 @@
 // Progress (Andamento): what tasks.md and the events hold, in four lanes.
 #pragma once
 
+#include "core/activity.hpp"
+
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -58,11 +60,6 @@ void render_log(Screen& screen, const Project& project, const std::string& run, 
 void render_task(Screen& screen, const Project& project, const std::string& task);
 
 // Activity: the newest events of every project, newest first.
-struct ActivityItem {
-  std::string project;
-  Event event;
-};
-std::vector<ActivityItem> load_activity(const std::vector<std::string>& roots, size_t limit);
 void render_activity(Screen& screen, const std::vector<ActivityItem>& items, int scroll, int64_t now_ms);
 
 // Review: the queue of finished runs, and one run with its instruments.

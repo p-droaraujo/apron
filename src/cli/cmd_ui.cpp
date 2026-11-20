@@ -58,7 +58,7 @@ int cmd_ui(const Args&) {
   tui::clamp_selection(model, view);
 
   enum class Mode { Progress, Log, Task, Review, ReviewRun, Activity } mode = Mode::Progress;
-  std::vector<tui::ActivityItem> activity;
+  std::vector<ActivityItem> activity;
   int activity_scroll = 0;
   std::string open_run, open_task, stat, status, input;
   bool typing = false;
@@ -66,7 +66,7 @@ int cmd_ui(const Args&) {
   int64_t last_load = timeutil::now_ms();
 
   auto reload = [&] {
-    if (mode == Mode::Activity) activity = tui::load_activity(machine_projects(*project), 500);
+    if (mode == Mode::Activity) activity = load_activity(machine_projects(*project), 500);
     model = tui::load_model(*project);
     queue = review_queue(*project);
     tui::clamp_selection(model, view);
@@ -147,7 +147,7 @@ int cmd_ui(const Args&) {
     if (on_tab && k.key == tui::Key::Char && k.ch == 'y') {
       mode = Mode::Activity;
       activity_scroll = 0;
-      activity = tui::load_activity(machine_projects(*project), 500);
+      activity = load_activity(machine_projects(*project), 500);
       continue;
     }
     switch (mode) {

@@ -11,6 +11,7 @@
 #include <fstream>
 #include <thread>
 
+#include "proto/frame.hpp"
 #include "proto/socket.hpp"
 #include "test.hpp"
 
@@ -74,5 +75,59 @@ TEST("cli: a run reported while aprond runs shows up in apron projects, linked t
   std::string line;
   std::getline(reg, line);
   CHECK_EQ(line, fs::canonical(dir / "demo").string());  // /var is /private/var on macOS
+  fs::remove_all(dir);
+}
+
+TEST("cli: machines over ssh: add, list, ls, attach, unreachable, and events.recent") {
+  fs::path dir = fs::temp_directory_path() / ("apron-ssh-" + std::to_string(::getpid()));
+  fs::remove_all(dir);
+  fs::create_directories(dir / "demo" / ".apron");
+  std::ofstream(dir / "demo" / ".apron" / "tasks.md") << "- [ ] D1 Demo\n  scope: **\n  done-when: it shows up\n";
+  std::string apron = std::string(APRON_BINARY_DIR) + "/apron";
+  std::string here = "NO_COLOR=1 APRON_LANG=en APRON_SOCKET=" + (dir / "here.sock").string() +
+                     " XDG_CONFIG_HOME=" + (dir / "config").string() + " APRON_FAKE_SSH_DIR=" + dir.string() +
+                     " APRON_SSH=" + std::string(APRON_SOURCE_DIR) + "/tests/fake-ssh.sh ";
+  // "box" is another machine: its own aprond, its own socket and state.
+  std::string box = "cd " + (dir / "demo").string() + " && NO_COLOR=1 APRON_LANG=en APRON_SOCKET=" +
+                    (dir / "box.sock").string() + " XDG_STATE_HOME=" + (dir / "box-state").string() +
+                    " APRON_AGENT=claude APRON_MACHINE=box ";
+
+  CHECK(sh(here + apron + " machines").find("no machines yet") != std::string::npos);
+  // Adding it starts its aprond through the proxy, like ssh would on a real machine.
+  std::string added = sh(here + apron + " machines add box " + apron);
+  CHECK(added.find("● box") != std::string::npos);
+  CHECK(fs::exists(dir / "box.sock"));
+
+  sh(box + apron + " new -d -- sh -c 'echo REMOTE-OK; exec sleep 30'");
+  sh(box + apron + " run start D1 --intent 'over there'");
+  std::this_thread::sleep_for(std::chrono::milliseconds(300));
+  CHECK(sh(here + apron + " ls box").find("sleep") != std::string::npos);
+  CHECK(sh(here + apron + " machines").find("1 running · 1 projects") != std::string::npos);
+  CHECK(sh(here + apron + " attach box:1 </dev/null").find("REMOTE-OK") != std::string::npos);  // the replay
+
+  std::string down = sh(here + apron + " machines add down; echo rc=$?");
+  CHECK(down.find("Connection refused") != std::string::npos);
+  CHECK(down.find("rc=1") != std::string::npos);
+  sh(here + apron + " machines rm down");
+  CHECK(sh(here + apron + " machines").find("down") == std::string::npos);
+
+  // events.recent: the newest events of the machine's projects, for a TUI elsewhere.
+  int fd = apron::proto::connect_unix(dir / "box.sock");
+  CHECK(fd >= 0);
+  apron::proto::write_all(fd, apron::proto::encode({apron::proto::Type::Ctrl, 0, R"({"id":1,"cmd":"events.recent","limit":10})"}));
+  apron::proto::Reader reader;
+  std::string got;
+  char buf[65536];
+  for (int i = 0; i < 50 && got.empty(); ++i) {
+    ssize_t n = read(fd, buf, sizeof buf);
+    if (n <= 0) break;
+    reader.feed(std::string_view(buf, static_cast<size_t>(n)));
+    if (auto f = reader.next()) got = f->payload;
+  }
+  close(fd);
+  CHECK(got.find("\"project\":\"demo\"") != std::string::npos);
+  CHECK(got.find("over there") != std::string::npos);
+
+  sh(box + apron + " daemon stop");
   fs::remove_all(dir);
 }

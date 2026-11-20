@@ -32,14 +32,13 @@ void term_size(int& cols, int& rows) {
   }
 }
 
-std::optional<DaemonClient> connect(bool autostart) {
-  DaemonClient c;
-  std::string err;
-  if (!c.connect(autostart, &err)) {
-    fail(err);
-    return std::nullopt;
-  }
-  return std::optional<DaemonClient>(std::move(c));
+std::optional<DaemonClient> connect(bool autostart) { return connect_to("", autostart); }
+
+// "nexus:3" is session 3 on nexus; "3" is session 3 here.
+std::pair<std::string, uint32_t> target(const std::string& arg) {
+  auto colon = arg.rfind(':');
+  if (colon == std::string::npos) return {"", static_cast<uint32_t>(std::atoi(arg.c_str()))};
+  return {arg.substr(0, colon), static_cast<uint32_t>(std::atoi(arg.c_str() + colon + 1))};
 }
 
 constexpr char kDetachKey = 0x1d;  // Ctrl-]
@@ -144,8 +143,8 @@ int cmd_new(const Args& args) {
   return attach(*c, id);
 }
 
-int cmd_ls(const Args&) {
-  auto c = connect(false);
+int cmd_ls(const Args& args) {
+  auto c = connect_to(args.pos.empty() ? "" : args.pos[0], false);
   if (!c) return 1;
   json::Object req;
   req.emplace_back("cmd", "sessions.list");
@@ -173,19 +172,21 @@ int cmd_ls(const Args&) {
 }
 
 int cmd_attach(const Args& args) {
-  if (args.pos.empty()) return fail(tr("usage: apron attach <session>"));
-  auto c = connect(false);
+  if (args.pos.empty()) return fail(tr("usage: apron attach [<machine>:]<session>"));
+  auto [host, id] = target(args.pos[0]);
+  auto c = connect_to(host, false);
   if (!c) return 1;
-  return attach(*c, static_cast<uint32_t>(std::atoi(args.pos[0].c_str())));
+  return attach(*c, id);
 }
 
 int cmd_kill(const Args& args) {
-  if (args.pos.empty()) return fail(tr("usage: apron kill <session>"));
-  auto c = connect(false);
+  if (args.pos.empty()) return fail(tr("usage: apron kill [<machine>:]<session>"));
+  auto [host, id] = target(args.pos[0]);
+  auto c = connect_to(host, false);
   if (!c) return 1;
   json::Object req;
   req.emplace_back("cmd", "sessions.kill");
-  req.emplace_back("session", std::atoi(args.pos[0].c_str()));
+  req.emplace_back("session", static_cast<long long>(id));
   std::string err;
   if (!c->request(std::move(req), &err)) return fail(err == "not_found" ? trf("no session {}", {args.pos[0]}) : err);
   return 0;

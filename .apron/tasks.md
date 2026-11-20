@@ -57,12 +57,12 @@ Apron's own plan, in the format described in `docs/agent-protocol.md`.
   done-when: every event is still written to `.apron/runs/`; if `aprond` is running it is told too, `apron projects` lists the machine's projects with their runs, and a run started inside an `apron` session records which session it is
   checks: build, test
 
-- [ ] T8 Hub: token pairing, its own CA and outbound mTLS connections
-  scope: src/hub/**, src/proto/**, tests/**
+- [x] T8 Machines over SSH: each machine runs its own aprond; `apron proxy` carries the protocol over `ssh <host>`, with no hub, token or certificate
+  scope: src/cli/**, src/daemon/**, src/proto/**, src/core/**, tests/**, CMakeLists.txt, README.md, docs/**
   depends: T6
-  done-when: two paired machines show up in `apron machines` and the hub routes `sessions.list` to each
+  done-when: `apron machines add <host>` uses a host from ~/.ssh/config; `apron machines` shows each one reachable or not; `apron ls <host>` and `apron attach <host>:<id>` work through ssh; the daemon answers `events.recent`
   checks: build, test
-  decision: the token and certificate format affect the security of every machine
+  decision: SSH instead of a hub with its own CA (decided by Pedro on 2026-11-20): it reuses the keys and access developers already have; the access to a machine is the SSH access, with no extra permission levels in Apron
 
 - [ ] T9 TUI renderer: cell grid, diff and synchronized output
   scope: src/tui/**, tests/**

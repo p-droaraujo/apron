@@ -2,6 +2,8 @@
 
 #include <fcntl.h>
 #include <poll.h>
+#include <signal.h>
+#include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -10,6 +12,7 @@
 #include <climits>
 #include <cstdlib>
 #include <filesystem>
+#include <sstream>
 #include <thread>
 
 #if defined(__APPLE__)
@@ -59,6 +62,72 @@ bool record(const Project& project, const Event& event, std::string* error) {
 
 DaemonClient::~DaemonClient() {
   if (fd_ >= 0) close(fd_);
+  if (ssh_err_ >= 0) close(ssh_err_);
+  if (ssh_ > 0) {
+    kill(ssh_, SIGTERM);
+    waitpid(ssh_, nullptr, 0);
+  }
+}
+
+bool DaemonClient::connect_ssh(const std::string& host, const std::string& remote, std::string* error) {
+  std::vector<std::string> argv;
+  const char* ssh = std::getenv("APRON_SSH");
+  std::istringstream words(ssh && *ssh ? ssh : "ssh");
+  for (std::string w; words >> w;) argv.push_back(w);
+  for (const char* o : {"-T", "-o", "BatchMode=yes", "-o", "ConnectTimeout=5", "-o", "ServerAliveInterval=15"})
+    argv.emplace_back(o);
+  argv.push_back(host);
+  argv.push_back(remote + " proxy");
+
+  int sv[2], err[2];
+  if (socketpair(AF_UNIX, SOCK_STREAM, 0, sv) != 0) return false;
+  if (pipe(err) != 0) {
+    close(sv[0]);
+    close(sv[1]);
+    return false;
+  }
+  pid_t pid = fork();
+  if (pid < 0) return false;
+  if (pid == 0) {
+    setsid();  // no terminal: ssh must never prompt over the TUI
+    dup2(sv[1], STDIN_FILENO);
+    dup2(sv[1], STDOUT_FILENO);
+    dup2(err[1], STDERR_FILENO);
+    close(sv[0]);
+    close(sv[1]);
+    close(err[0]);
+    close(err[1]);
+    std::vector<char*> args;
+    for (auto& a : argv) args.push_back(a.data());
+    args.push_back(nullptr);
+    execvp(args[0], args.data());
+    _exit(127);
+  }
+  close(sv[1]);
+  close(err[1]);
+  fcntl(err[0], F_SETFL, O_NONBLOCK);
+  fd_ = sv[0];
+  ssh_ = pid;
+  ssh_err_ = err[0];
+  timeout_ms_ = 20000;  // ssh, then perhaps starting aprond over there
+  json::Object hello;
+  hello.emplace_back("cmd", "hello");
+  std::string e;
+  if (request(std::move(hello), &e)) return true;
+  std::string why = ssh_error();
+  if (error) *error = why.empty() ? e : why;
+  return false;
+}
+
+std::string DaemonClient::ssh_error() const {
+  if (ssh_err_ < 0) return "";
+  std::string all;
+  char buf[4096];
+  ssize_t n;
+  while ((n = ::read(ssh_err_, buf, sizeof buf)) > 0) all.append(buf, static_cast<size_t>(n));
+  while (!all.empty() && (all.back() == '\n' || all.back() == '\r')) all.pop_back();
+  auto nl = all.find_last_of('\n');
+  return nl == std::string::npos ? all : all.substr(nl + 1);  // the last line says why
 }
 
 bool DaemonClient::start_daemon(std::string* error) {
@@ -131,7 +200,7 @@ std::optional<json::Value> DaemonClient::request(json::Object body, std::string*
     return std::nullopt;
   }
   while (true) {
-    auto f = next(5000);
+    auto f = next(timeout_ms_);
     if (!f) {
       if (error) *error = tr("aprond did not answer");
       return std::nullopt;

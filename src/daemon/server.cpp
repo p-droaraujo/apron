@@ -1,5 +1,7 @@
 #include "daemon/server.hpp"
 
+#include "core/activity.hpp"
+
 #include <fcntl.h>
 #include <poll.h>
 #include <signal.h>
@@ -7,6 +9,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+#include <algorithm>
 #include <cstdio>
 #include <cstdlib>
 #include <map>
@@ -224,6 +227,22 @@ void Server::handle_ctrl(Client& c, const std::string& payload) {
   } else if (cmd == "projects.list") {
     json::Object b;
     b.emplace_back("projects", registry_.list());
+    reply(c, *req, std::move(b));
+  } else if (cmd == "events.recent") {
+    // The newest events of every project on this machine, for a TUI elsewhere.
+    std::vector<std::string> roots;
+    json::Value projects = registry_.list();
+    for (const auto& p : projects.arr()) roots.push_back(p.get_str("root"));
+    size_t limit = static_cast<size_t>(std::clamp(num(*req, "limit", 200), 1, 2000));
+    json::Array events;
+    for (auto& item : load_activity(roots, limit)) {
+      json::Object o;
+      o.emplace_back("project", item.project);
+      o.emplace_back("event", item.event.to_json());
+      events.emplace_back(std::move(o));
+    }
+    json::Object b;
+    b.emplace_back("events", std::move(events));
     reply(c, *req, std::move(b));
   } else if (cmd == "daemon.stop") {
     reply(c, *req, {});

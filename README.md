@@ -8,7 +8,7 @@ The apron is where aircraft park, refuel and get checked between flights. Apron 
 
 ## What works today
 
-`apron` with no arguments opens the progress view: four lanes (plan, running, gates, done) built from `.apron/tasks.md` and the run events, refreshing as agents report. Arrows or hjkl move, Enter opens a run's timeline or a task's fields, `q` quits. It reads local files only; the view across machines comes with the daemon and the hub.
+`apron` with no arguments opens the progress view: four lanes (plan, running, gates, done) built from `.apron/tasks.md` and the run events, refreshing as agents report. Arrows or hjkl move, Enter opens a run's timeline or a task's fields, `q` quits. It reads local files; the view across machines comes with T10.
 
 ```
  shop · mac                                                                            20:52 UTC
@@ -62,6 +62,21 @@ Enter on a running card marked ⌨ takes over the agent's terminal (the run was 
 ./build/apron projects              # every project on this machine, with its runs
 ```
 
+## Other machines, over SSH
+
+Every machine runs its own `aprond`. Another machine reaches it through `ssh <host> apron proxy`, which carries the same protocol over SSH. There is no hub, token or certificate: if `ssh nexus` works without a password prompt (keys, an agent, or Tailscale SSH), Apron works, and the access Apron has there is the access your SSH login has.
+
+```sh
+apron machines add nexus            # a host from ~/.ssh/config; Apron must be installed there
+apron machines add buildbox ~/.local/bin/apron   # when apron is not on the PATH of a non-interactive ssh
+apron machines                      # each machine, reachable or not, with what runs there
+apron ls nexus                      # its sessions
+apron attach nexus:3                # take over session 3 on nexus; Ctrl-] detaches
+apron machines rm buildbox
+```
+
+The list lives in `~/.config/apron/machines`, one host per line. `APRON_SSH` replaces the `ssh` command (the tests use it).
+
 ## Claude Code reports by itself
 
 With the hooks in [`integrations/claude-code/`](integrations/claude-code/) (already on in this repository), Claude Code tells Apron when it reads, edits, builds or tests, when it waits for you, and it closes its run before ending its turn.
@@ -69,7 +84,7 @@ With the hooks in [`integrations/claude-code/`](integrations/claude-code/) (alre
 ## How it fits together
 
 - `aprond` — a daemon on each machine that owns terminals and agents.
-- `aprond hub` — runs on an always-on machine, links all machines over Tailscale with mTLS (T8).
+- `apron proxy` — what `ssh <host>` runs to reach that machine's `aprond`; machines talk over SSH only.
 - `apron` — the TUI, in any modern terminal (Ghostty recommended).
 
 Design docs are in Portuguese for now:

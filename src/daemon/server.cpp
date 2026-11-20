@@ -219,6 +219,9 @@ void Server::handle_ctrl(Client& c, const std::string& payload) {
     Session* s = Session::spawn(id, argv, req->get_str("cwd"), num(*req, "cols", 80), num(*req, "rows", 24), &err);
     if (!s) return reply(c, *req, {}, false, err);
     sessions_[id].reset(s);
+    // Typed into the new terminal, as if by the person: "claude\r" in a shell
+    // starts the agent with the shell's own environment, and the shell stays.
+    if (std::string input = req->get_str("input"); !input.empty()) s->write_input(input);
     json::Object b;
     b.emplace_back("session", static_cast<long long>(id));
     reply(c, *req, std::move(b));

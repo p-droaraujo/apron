@@ -225,10 +225,54 @@ int cmd_daemon(const Args& args) {
 
 }  // namespace
 
-int attach_session(uint32_t id) {
-  auto c = connect(false);
+int attach_session(const std::string& host, uint32_t id) {
+  auto c = connect_to(host, false);
   if (!c) return 1;
   return attach(*c, id);
+}
+
+namespace {
+
+std::optional<DaemonClient> quiet_connect(const std::string& host, std::string* error) {
+  DaemonClient c;
+  bool ok;
+  if (host.empty()) {
+    ok = c.connect(true, error);
+  } else {
+    auto all = load_machines();
+    const Machine* m = find_machine(all, host);
+    ok = c.connect_ssh(host, m ? m->remote : "apron", error);
+  }
+  if (!ok) return std::nullopt;
+  return std::optional<DaemonClient>(std::move(c));
+}
+
+}  // namespace
+
+uint32_t spawn_session(const std::string& host, const std::string& cwd, const std::string& input, std::string* error) {
+  auto c = quiet_connect(host, error);
+  if (!c) return 0;
+  int cols, rows;
+  term_size(cols, rows);
+  json::Object req;
+  req.emplace_back("cmd", "sessions.spawn");
+  req.emplace_back("argv", json::Array{});
+  req.emplace_back("cwd", cwd);
+  req.emplace_back("cols", cols);
+  req.emplace_back("rows", rows);
+  if (!input.empty()) req.emplace_back("input", input);
+  auto reply = c->request(std::move(req), error);
+  if (!reply || !reply->find("session")) return 0;
+  return static_cast<uint32_t>(reply->find("session")->num());
+}
+
+bool kill_session(const std::string& host, uint32_t id, std::string* error) {
+  auto c = quiet_connect(host, error);
+  if (!c) return false;
+  json::Object req;
+  req.emplace_back("cmd", "sessions.kill");
+  req.emplace_back("session", static_cast<long long>(id));
+  return c->request(std::move(req), error).has_value();
 }
 
 int cmd_sessions(const std::string& cmd, const Args& args) {

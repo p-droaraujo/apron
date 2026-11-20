@@ -102,10 +102,10 @@ One JSON line per event in `.apron/runs/<run>.jsonl`:
 | `kind` | When | Extra fields | Shows up as |
 | --- | --- | --- | --- |
 | `run.started` | On picking up a task | `intent`, `base` (commit), `session` (if inside one) | A card in Running, ● |
-| `step` | On changing work phase | — | A point on the trajectory |
-| `ask` | A decision is needed | — | ◐ and a card in Gates |
-| `blocked` | Something outside stops progress | — | ⊘ with the reason |
-| `note` | Something the next run should know | — | A line in the session log |
+| `step` | On changing work phase |  | A point on the trajectory |
+| `ask` | A decision is needed |  | ◐ and a card in Gates |
+| `blocked` | Something outside stops progress |  | ⊘ with the reason |
+| `note` | Something the next run should know |  | A line in the session log |
 | `check` | A check ran | `name`, `ok`, `ms` | The checks instrument |
 | `run.finished` | On finishing | `result` (done, failed, abandoned) | The card waits in Gates for review |
 | `review` | A person reviewed the run | `action` (merged, returned, discarded) | The card leaves Gates |

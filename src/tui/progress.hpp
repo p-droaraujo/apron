@@ -50,9 +50,6 @@ struct View {
 
 void clamp_selection(const Model& model, View& view);
 
-// The tab bar on the first line: Progress, Review (with its count), Activity.
-void render_tabs(Screen& screen, int active, int review_count, bool activity);
-void render_progress(Screen& screen, const Model& model, const View& view, int64_t now_ms);
 
 // A run's timeline, scrollable.
 void render_log(Screen& screen, const Project& project, const std::string& run, int scroll, int64_t now_ms);
@@ -62,9 +59,7 @@ void render_task(Screen& screen, const Project& project, const std::string& task
 // Activity: the newest events of every project, newest first.
 void render_activity(Screen& screen, const std::vector<ActivityItem>& items, int scroll, int64_t now_ms);
 
-// Review: the queue of finished runs, and one run with its instruments.
-void render_review_list(Screen& screen, const std::vector<RunSummary>& queue, int index, int64_t now_ms);
-void render_review(Screen& screen, const Project& project, const RunSummary& run, const std::string& stat,
-                   const std::string& status, const std::string* input);
+// One finished run with its instruments: trajectory, checks, scope, changes.
+void render_review(Screen& screen, const Project& project, const RunSummary& run, const std::string& stat);
 
 }  // namespace apron::tui

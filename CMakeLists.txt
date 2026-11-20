@@ -50,6 +50,7 @@ add_library(apron_tui
   src/tui/term.cpp
   src/tui/screen.cpp
   src/tui/progress.cpp
+  src/tui/app.cpp
 )
 target_link_libraries(apron_tui PUBLIC apron_core)
 target_include_directories(apron_core PUBLIC src)
@@ -79,6 +80,7 @@ add_executable(apron
   src/cli/cmd_review.cpp
   src/cli/cmd_machines.cpp
   src/cli/daemon_client.cpp
+  src/cli/fleet.cpp
 )
 target_link_libraries(apron PRIVATE apron_tui apron_proto)
 

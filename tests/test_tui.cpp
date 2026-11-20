@@ -7,6 +7,7 @@
 #include "core/i18n.hpp"
 #include "core/time.hpp"
 #include "test.hpp"
+#include "tui/app.hpp"
 #include "tui/progress.hpp"
 #include "tui/screen.hpp"
 
@@ -95,15 +96,17 @@ TEST("progress: tasks and runs land in the right lanes") {
   Screen s;
   s.resize(120, 20);
   View v;
+  std::vector<Hit> hits;
   i18n::set(i18n::Lang::En);
-  render_progress(s, m, v, timeutil::now_ms());
-  CHECK(screen_has(s, "GATES 1"));
+  render_board(s, {0, 0, 120, 20}, m, v, true, {}, timeutil::now_ms(), hits);
+  CHECK(screen_has(s, "Gates 1"));
   i18n::set(i18n::Lang::PtBr);
-  render_progress(s, m, v, timeutil::now_ms());
-  CHECK(screen_has(s, "PORTÕES 1"));
+  s.clear();
+  render_board(s, {0, 0, 120, 20}, m, v, true, {}, timeutil::now_ms(), hits);
+  CHECK(screen_has(s, "Portões 1"));
   i18n::set(i18n::Lang::En);
   CHECK(screen_has(s, "o schema pode mudar?"));
-  CHECK(screen_has(s, "◐ 1"));
+  CHECK(!hits.empty());  // every card can be clicked
   fs::remove_all(root);
 }
 

@@ -130,6 +130,19 @@ int list(const std::vector<Machine>& all) {
 
 }  // namespace
 
+std::string add_machine(const std::string& host, const std::string& remote) {
+  if (host.empty() || host[0] == '-' || host.find_first_of(" \t") != std::string::npos) return trf("not a host: {}", {host});
+  auto all = load_machines();
+  bool known = false;
+  for (auto& x : all)
+    if (x.host == host) {
+      x.remote = remote;
+      known = true;
+    }
+  if (!known) all.push_back({host, remote});
+  return save_machines(all) ? "" : trf("could not write {}", {machines_file().string()});
+}
+
 int cmd_machines(const Args& args) {
   auto all = load_machines();
   std::string sub = args.pos.empty() ? "" : args.pos[0];
@@ -137,14 +150,7 @@ int cmd_machines(const Args& args) {
   if (sub == "add") {
     if (args.pos.size() < 2) return fail(tr("usage: apron machines add <ssh host> [apron command there]"));
     Machine m{args.pos[1], args.pos.size() > 2 ? args.rest(2) : "apron"};
-    bool known = false;
-    for (auto& x : all)
-      if (x.host == m.host) {
-        x = m;
-        known = true;
-      }
-    if (!known) all.push_back(m);
-    if (!save_machines(all)) return fail(trf("could not write {}", {machines_file().string()}));
+    if (std::string err = add_machine(m.host, m.remote); !err.empty()) return fail(err);
     return list({m});
   }
   if (sub == "rm") {

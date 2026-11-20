@@ -77,6 +77,14 @@ int Screen::put(int x, int y, std::string_view text, Style style, int max_w) {
   return col;
 }
 
+void Screen::blit(const Screen& src, int x, int y) {
+  for (int sy = 0; sy < src.h_; ++sy)
+    for (int sx = 0; sx < src.w_; ++sx) {
+      int dx = x + sx, dy = y + sy;
+      if (dx >= 0 && dx < w_ && dy >= 0 && dy < h_) back_[static_cast<size_t>(dy * w_ + dx)] = src.at(sx, sy);
+    }
+}
+
 void Screen::fill(int x, int y, int w, std::string_view ch, Style style) {
   for (int i = 0; i < w; ++i) put(x + i, y, ch, style, 1);
 }

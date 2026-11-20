@@ -10,9 +10,9 @@ using namespace apron;
 
 TEST("i18n: English by default, Portuguese on request, English as fallback") {
   i18n::set(i18n::Lang::En);
-  CHECK_EQ(tr("GATES"), std::string("GATES"));
+  CHECK_EQ(tr("Gates"), std::string("Gates"));
   i18n::set(i18n::Lang::PtBr);
-  CHECK_EQ(tr("GATES"), std::string("PORTÕES"));
+  CHECK_EQ(tr("Gates"), std::string("Portões"));
   CHECK_EQ(trf("run not found: {}", {"r-1"}), std::string("execução não encontrada: r-1"));
   CHECK_EQ(tr("a string nobody translated"), std::string("a string nobody translated"));
   i18n::set(i18n::Lang::En);

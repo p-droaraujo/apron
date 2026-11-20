@@ -8,59 +8,9 @@
 #include "core/review.hpp"
 #include "core/tasks.hpp"
 #include "core/time.hpp"
+#include "tui/palette.hpp"
 
 namespace apron::tui {
-
-namespace {
-
-// The v2 palette: color only for state.
-const Style kText{Color::hex(0xe6e8eb), {}, false};
-const Style kBold{Color::hex(0xe6e8eb), {}, true};
-const Style kSoft{Color::hex(0xa3aab5), {}, false};
-const Style kDim{Color::hex(0x7d8592), {}, false};
-const Style kLine{Color::hex(0x3a404b), {}, false};
-const Style kBlue{Color::hex(0x7aa2f7), {}, false};
-const Style kBlue2{Color::hex(0x4a6bb0), {}, false};
-const Style kAmber{Color::hex(0xe0af68), {}, false};
-const Style kRed{Color::hex(0xf7768e), {}, false};
-const Style kBadge{Color::hex(0x0f1115), Color::hex(0xe6e8eb), true};
-constexpr uint32_t kSelected = 0x1f2430;
-
-Style with_bg(Style s, bool selected) {
-  if (selected) s.bg = Color::hex(kSelected);
-  return s;
-}
-
-Style state_style(RunState s) {
-  switch (s) {
-    case RunState::Working: return kBlue;
-    case RunState::Waiting: return kAmber;
-    case RunState::Failed: return kRed;
-    default: return kDim;
-  }
-}
-
-const char* state_glyph(RunState s) {
-  switch (s) {
-    case RunState::Working: return "●";
-    case RunState::Waiting: return "◐";
-    case RunState::Blocked: return "⊘";
-    case RunState::Done: return "✓";
-    case RunState::Failed: return "✕";
-    case RunState::Abandoned: return "–";
-  }
-  return "●";
-}
-
-std::string ago(int64_t now, int64_t then) { return timeutil::short_duration(now - then); }
-
-// Titles come from markdown; on screen, backticks help nobody.
-std::string plain(std::string s) {
-  s.erase(std::remove(s.begin(), s.end(), '`'), s.end());
-  return s;
-}
-
-}  // namespace
 
 Model load_model(const Project& project) {
   Model m;
@@ -100,10 +50,7 @@ Model load_model(const Project& project) {
         // A finished run waits in gates until a person reviews it.
         it.lane = r.needs_review() ? Lane::Portoes : Lane::Feito;
         it.since_ms = r.last_ms;
-        if (r.needs_review()) {
-          it.detail = tr("waiting for review");
-          it.review = true;
-        }
+        it.review = r.needs_review();  // the lane says it waits; the card shows the summary
     }
     if (r.state == RunState::Working) ++m.working;
     if (r.state == RunState::Waiting || r.needs_review()) ++m.waiting;
@@ -120,7 +67,7 @@ Model load_model(const Project& project) {
       Item it;
       it.task = t.id;
       it.title = plain(t.title);
-      it.who = t.field("por");
+      it.who = t.field(kBy);
       if (t.state == ' ') {
         it.lane = Lane::Plano;
         auto why = blockers_to_start(*file, t);
@@ -155,81 +102,6 @@ void clamp_selection(const Model& model, View& view) {
   view.lane = std::clamp(view.lane, 0, 3);
   int n = static_cast<int>(model.lanes[view.lane].size());
   view.index = n == 0 ? 0 : std::clamp(view.index, 0, n - 1);
-}
-
-void render_progress(Screen& sc, const Model& m, const View& v, int64_t now) {
-  sc.clear();
-  int W = sc.width(), H = sc.height();
-
-  // Header: the project and the machine.
-  int x = sc.put(1, 0, m.project, kBold);
-  sc.put(1 + x + 1, 0, "· " + m.machine, kDim);
-  std::string clock = timeutil::iso8601(now).substr(11, 5) + " UTC";
-  sc.put(W - text_width(clock) - 1, 0, clock, kDim);
-
-  // Four lanes.
-  const std::string names[4] = {tr("PLAN"), tr("RUNNING"), tr("GATES"), tr("DONE")};
-  int gap = 3, left = 1;
-  int cw = std::max(12, (W - 2 - gap * 3) / 4);
-  int top = 2, bottom = H - 2;
-  for (int lane = 0; lane < 4; ++lane) {
-    int lx = left + lane * (cw + gap);
-    const auto& items = m.lanes[lane];
-    int hx = sc.put(lx, top, names[lane], kDim);
-    sc.put(lx + hx + 1, top, std::to_string(items.size()), kText);
-    sc.fill(lx, top + 1, cw, "─", kLine);
-
-    int y = top + 2;
-    for (size_t i = 0; i < items.size() && y < bottom; ++i) {
-      const Item& it = items[i];
-      bool sel = v.lane == lane && v.index == static_cast<int>(i);
-      if (lane == 0 || lane == 3) {
-        // One line per task.
-        const char* g = lane == 3 ? state_glyph(it.state) : it.ready ? "○" : "◌";
-        Style gs = lane == 3 ? state_style(it.state) : it.ready ? kSoft : kLine;
-        if (lane == 3 && it.state == RunState::Done) gs = kSoft;
-        if (sel) sc.fill(lx, y, cw, " ", with_bg(kText, true));
-        sc.put(lx, y, g, with_bg(gs, sel));
-        int ix = sc.put(lx + 2, y, it.task, with_bg(it.ready || lane == 3 ? kText : kDim, sel));
-        std::string tail = lane == 3 && it.since_ms ? ago(now, it.since_ms) : it.detail;
-        int tw = text_width(tail);
-        int room = cw - 2 - ix - 1 - (tw ? tw + 1 : 0);
-        sc.put(lx + 2 + ix + 1, y, fit(it.title, room), with_bg(it.ready || lane == 3 ? kSoft : kDim, sel));
-        if (tw) sc.put(lx + cw - tw, y, tail, with_bg(kDim, sel));
-        y += 1;
-        continue;
-      }
-      // A three-line card with the side bar in the state color.
-      RunState shown = it.review ? RunState::Waiting : it.state;  // review waits for you
-      Style bar = state_style(shown);
-      bool breathing = it.state == RunState::Working && it.from_run;
-      Style gstyle = breathing && (v.tick / 6) % 2 ? kBlue2 : bar;
-      for (int r = 0; r < 3 && y + r < bottom; ++r) {
-        if (sel) sc.fill(lx, y + r, cw, " ", with_bg(kText, true));
-        sc.put(lx, y + r, "▌", with_bg(bar, sel));
-      }
-      std::string dur = it.since_ms ? ago(now, it.since_ms) : "";
-      if (!it.session.empty() && it.lane == Lane::Executando) dur = "⌨ " + dur;  // Enter opens its terminal
-      sc.put(lx + 2, y, state_glyph(shown), with_bg(gstyle, sel));
-      sc.put(lx + 4, y, fit(it.who.empty() ? "—" : it.who, cw - 6 - text_width(dur)), with_bg(kSoft, sel));
-      sc.put(lx + cw - text_width(dur), y, dur, with_bg(kDim, sel));
-      int tx = sc.put(lx + 2, y + 1, it.task, with_bg(kBold, sel));
-      sc.put(lx + 3 + tx, y + 1, fit(it.title, cw - 3 - tx), with_bg(kText, sel));
-      Style ds = shown == RunState::Waiting ? kAmber : kDim;
-      sc.put(lx + 2, y + 2, fit(it.detail, cw - 2), with_bg(ds, sel));
-      y += 4;
-    }
-    if (items.empty()) sc.put(lx, top + 2, "—", kLine);
-  }
-
-  // Status bar: real state only.
-  int sy = H - 1;
-  int bx = sc.put(0, sy, " APRON ", kBadge) + 1;
-  if (m.waiting) bx += sc.put(bx, sy, "◐ " + std::to_string(m.waiting), kAmber) + 2;
-  if (m.working) bx += sc.put(bx, sy, "● " + std::to_string(m.working), kBlue) + 2;
-  if (m.blocked) bx += sc.put(bx, sy, "⊘ " + std::to_string(m.blocked), kDim) + 2;
-  std::string hint = v.help ? tr("←→↑↓ move · enter open (⌨ the agent's terminal) · o log · v review · y activity · q quit") : tr("? help");
-  sc.put(W - text_width(hint) - 1, sy, hint, kDim);
 }
 
 void render_log(Screen& sc, const Project& project, const std::string& run, int scroll, int64_t now) {
@@ -286,9 +158,6 @@ void render_log(Screen& sc, const Project& project, const std::string& run, int 
     for (const auto& f : s.outside)
       if (y < H - 1) sc.put(3, y++, "✕ " + f, kAmber);
   }
-  sc.put(0, H - 1, " APRON ", kBadge);
-  std::string back = tr("↑↓ scroll · esc back");
-  sc.put(W - text_width(back) - 1, H - 1, back, kDim);
 }
 
 void render_task(Screen& sc, const Project& project, const std::string& id) {
@@ -317,69 +186,19 @@ void render_task(Screen& sc, const Project& project, const std::string& id) {
         if (y < H - 1) sc.put(1, y++, "◌ " + w, kDim);
     }
   }
-  sc.put(0, H - 1, " APRON ", kBadge);
-  std::string back = tr("esc back");
-  sc.put(W - text_width(back) - 1, H - 1, back, kDim);
 }
 
-void render_tabs(Screen& sc, int active, int review_count, bool activity) {
-  std::string names[3] = {tr("Progress"), tr("Review"), tr("Activity")};
-  int shown = activity ? 3 : 2;
-  if (review_count > 0) names[1] += " " + std::to_string(review_count);
-  int total = 0;
-  for (int i = 0; i < shown; ++i) total += text_width(names[i]) + 4;
-  int x = std::max(20, (sc.width() - total) / 2);
-  for (int i = 0; i < shown; ++i) {
-    Style s = i == active ? Style{Color::hex(0xe6e8eb), Color::hex(kSelected), false} : kDim;
-    if (i == 1 && review_count > 0 && i != active) s = kAmber;
-    x += sc.put(x, 0, " " + names[i] + " ", s) + 2;
-  }
-}
-
-void render_review_list(Screen& sc, const std::vector<RunSummary>& queue, int index, int64_t now) {
-  sc.clear();
-  int W = sc.width(), H = sc.height();
-  int hx = sc.put(1, 2, tr("REVIEW"), kDim);
-  sc.put(2 + hx, 2, std::to_string(queue.size()), kText);
-  sc.fill(1, 3, W - 2, "─", kLine);
-  if (queue.empty()) sc.put(1, 4, tr("nothing to review"), kDim);
-  int y = 4;
-  for (size_t i = 0; i < queue.size() && y + 1 < H - 1; ++i, y += 3) {
-    const RunSummary& r = queue[i];
-    bool sel = static_cast<int>(i) == index;
-    bool bad = r.checks_failed > 0 || r.state == RunState::Failed;
-    for (int k = 0; k < 2; ++k) {
-      if (sel) sc.fill(1, y + k, W - 2, " ", with_bg(kText, true));
-      sc.put(1, y + k, "▌", with_bg(bad ? kRed : kAmber, sel));
-    }
-    int x = 3 + sc.put(3, y, r.task, with_bg(kBold, sel));
-    x += 1 + sc.put(x + 1, y, r.agent + "@" + r.machine, with_bg(kSoft, sel));
-    if (r.checks_ok + r.checks_failed)
-      x += 2 + sc.put(x + 2, y, "checks " + std::to_string(r.checks_ok) + "/" + std::to_string(r.checks_ok + r.checks_failed),
-                      with_bg(bad ? kRed : kSoft, sel));
-    if (!r.outside.empty())
-      x += 2 + sc.put(x + 2, y, "✕" + std::to_string(r.outside.size()) + " " + tr("outside"), with_bg(kAmber, sel));
-    std::string when = ago(now, r.last_ms);
-    sc.put(W - 2 - text_width(when), y, when, with_bg(kDim, sel));
-    sc.put(3, y + 1, fit(r.last_msg, W - 5), with_bg(kText, sel));
-  }
-  sc.put(0, H - 1, " APRON ", kBadge);
-  std::string hint = tr("↑↓ move · enter open · esc back · q quit");
-  sc.put(W - text_width(hint) - 1, H - 1, hint, kDim);
-}
-
-void render_review(Screen& sc, const Project& project, const RunSummary& r, const std::string& stat,
-                   const std::string& status, const std::string* input) {
+void render_review(Screen& sc, const Project& project, const RunSummary& r, const std::string& stat) {
   sc.clear();
   int W = sc.width(), H = sc.height();
   auto events = load_events(project.run_file(r.id));
-  int x = sc.put(1, 2, r.task, kBold);
-  x += 1 + sc.put(2 + x, 2, "· " + r.agent + "@" + r.machine, kSoft);
-  sc.put(3 + x, 2, "· " + timeutil::short_duration(r.last_ms - r.started_ms), kDim);
-  sc.put(1, 3, fit(r.last_msg, W - 2), kText);
+  int x = sc.put(1, 0, r.task, kBold);
+  x += 1 + sc.put(2 + x, 0, "· " + r.agent + "@" + r.machine, kSoft);
+  sc.put(3 + x, 0, "· " + timeutil::short_duration(r.last_ms - r.started_ms), kDim);
+  sc.put(1, 1, fit(r.last_msg, W - 2), kText);
 
   // Left: trajectory and checks. Right: scope and changes.
-  int mid = W / 2, y = 5;
+  int mid = W / 2, y = 3;
   sc.put(1, y++, tr("trajectory"), kDim);
   for (const auto& e : events) {
     if (y >= H - 4) break;
@@ -399,7 +218,7 @@ void render_review(Screen& sc, const Project& project, const RunSummary& r, cons
     sc.put(3, y++, e.extra_str("name"), kText);
   }
 
-  int ry = 5;
+  int ry = 3;
   if (r.files >= 0) {
     std::string line = trf("scope: {} files, {} outside", {std::to_string(r.files), std::to_string(r.outside.size())});
     sc.put(mid, ry++, line, r.outside.empty() ? kDim : kAmber);
@@ -413,22 +232,13 @@ void render_review(Screen& sc, const Project& project, const RunSummary& r, cons
   std::string line;
   while (std::getline(lines, line) && ry < H - 3) sc.put(mid, ry++, fit(line, W - mid - 1), kSoft);
 
-  if (!status.empty()) sc.put(1, H - 3, fit(status, W - 2), kAmber);
-  if (input) {
-    std::string prompt = tr("comment for the agent (enter sends, esc cancels): ");
-    int px = sc.put(1, H - 2, prompt, kAmber);
-    sc.put(1 + px, H - 2, fit(*input + "▏", W - 2 - px), kText);
-  }
-  sc.put(0, H - 1, " APRON ", kBadge);
-  std::string hint = tr("m merge · r return with a comment · d discard · esc back");
-  sc.put(W - text_width(hint) - 1, H - 1, hint, kDim);
 }
 
 void render_activity(Screen& sc, const std::vector<ActivityItem>& items, int scroll, int64_t now) {
   sc.clear();
   int W = sc.width(), H = sc.height();
-  if (items.empty()) sc.put(1, 2, tr("no activity yet"), kDim);
-  int y = 2;
+  if (items.empty()) sc.put(1, 0, tr("no activity yet"), kDim);
+  int y = 0;
   for (size_t i = static_cast<size_t>(std::max(0, scroll)); i < items.size() && y < H - 1; ++i, ++y) {
     const Event& e = items[i].event;
     std::string g = "·", msg = e.msg;
@@ -465,9 +275,6 @@ void render_activity(Screen& sc, const std::vector<ActivityItem>& items, int scr
     x += 1 + sc.put(x, y, fit(e.agent + "@" + e.machine, 18), kDim);
     sc.put(x, y, fit(msg, W - x - 1), ms);
   }
-  sc.put(0, H - 1, " APRON ", kBadge);
-  std::string hint = tr("↑↓ scroll · esc back");
-  sc.put(W - text_width(hint) - 1, H - 1, hint, kDim);
 }
 
 }  // namespace apron::tui

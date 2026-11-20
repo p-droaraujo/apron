@@ -4,6 +4,8 @@ Apron's own plan, in the format described in `docs/agent-protocol.md`.
 
 ## v0a · Observe
 
+See every agent on one screen and reach the right terminal in one keystroke.
+
 - [x] T1 Local events: `apron run start`, `apron report`, `apron run finish` and `apron log`
   scope: CMakeLists.txt, src/**, tests/**
   done-when: a run started, narrated and finished through the CLI shows up whole in `apron log`
@@ -64,16 +66,10 @@ Apron's own plan, in the format described in `docs/agent-protocol.md`.
   checks: build, test
   decision: SSH instead of a hub with its own CA (decided by Pedro on 2026-11-20): it reuses the keys and access developers already have; the access to a machine is the SSH access, with no extra permission levels in Apron
 
-- [ ] T9 TUI renderer: cell grid, diff and synchronized output
+- [x] T9 TUI renderer: cell grid, diff and synchronized output
   scope: src/tui/**, tests/**
   depends: T6
   done-when: a test frame draws and redraws only the changed cells
-  checks: build, test
-
-- [ ] T10 Progress view across machines, from the daemon's events
-  scope: src/tui/**, tests/**
-  depends: T7, T9, T11
-  done-when: the progress view shows the runs of every project and machine with the agent states
   checks: build, test
 
 - [x] T13 Claude Code hooks, second pass: a C++ `apron hook` instead of sed, the stuck ◐ after a permission prompt, and the hooks on in this repository
@@ -82,7 +78,33 @@ Apron's own plan, in the format described in `docs/agent-protocol.md`.
   done-when: `apron hook <event>` reads Claude Code's JSON with the real parser; approving a permission prompt takes the card out of gates; the Stop nudge can be turned off; the hook tests run in ctest; this repository's own Claude Code sessions report through the hooks
   checks: build, test
 
+- [x] T16 From a card to the agent's terminal: Enter on a running card attaches to its session
+  scope: CMakeLists.txt, src/tui/**, src/cli/**, tests/**
+  depends: T7, T11
+  done-when: Enter on a running card whose run recorded a session leaves the TUI, attaches to that session, and Ctrl-] comes back to the TUI
+  checks: build, test
+
+- [x] T20 A product screen: a sidebar with projects, sessions and machines; cards as boxes with clickable buttons on the selected one; Tab cycles views, Esc goes back one level; Enter opens the agent's terminal on any card with a live session; n starts a session; a footer with the keys of the current screen; interface copy and docs following unslop-ui
+  scope: src/tui/**, src/cli/**, src/daemon/server.cpp, src/core/i18n.cpp, tests/**, README.md, docs/**, AGENTS.md, CMakeLists.txt
+  depends: T19
+  done-when: the sidebar lists every machine's sessions by project and Enter attaches to one, local or over ssh; the board draws boxed cards with buttons that work by key and by mouse; Tab, Shift-Tab and Esc behave the same on every screen; the Review tab is gone and reviewing happens from a Gates card; no uppercase eyebrow labels, duplicated status or em dashes in the interface and docs
+  checks: build, test
+
+- [ ] T10 Progress view across machines, from the daemon's events
+  scope: src/tui/**, tests/**
+  depends: T7, T9, T11
+  done-when: the progress view shows the runs of every project and machine with the agent states
+  checks: build, test
+
+- [ ] T22 Cut the commands: a person needs `apron` and `apron new`; agents use `run`, `report` and `check`; `hook`, `proxy` and `daemon` leave the help; the rest goes once the screen covers it
+  scope: src/cli/**, src/core/i18n.cpp, tests/**, README.md, docs/**, AGENTS.md, integrations/**
+  depends: T20
+  done-when: `apron --help` lists two commands for people and three for agents; nothing the removed commands did is lost from the screen; tests and docs follow
+  checks: build, test
+
 ## v0b · Review
+
+Merge with confidence without opening the editor.
 
 - [x] T14 Review tab: finished runs with trajectory, checks, scope and the diff, and the actions merge, return to the agent, discard
   scope: CMakeLists.txt, src/tui/**, src/cli/**, src/core/**, tests/**, README.md
@@ -95,14 +117,6 @@ Apron's own plan, in the format described in `docs/agent-protocol.md`.
   depends: T7, T11
   done-when: `y` in the TUI shows the latest events of all projects aprond knows, newest first, and updates live
   checks: build, test
-
-- [x] T16 From a card to the agent's terminal: Enter on a running card attaches to its session
-  scope: CMakeLists.txt, src/tui/**, src/cli/**, tests/**
-  depends: T7, T11
-  done-when: Enter on a running card whose run recorded a session leaves the TUI, attaches to that session, and Ctrl-] comes back to the TUI
-  checks: build, test
-
-## Quality
 
 - [x] T17 Code review pass: Release by default, a daemon that never blocks on a slow client or agent, git without a shell, cached run summaries
   scope: src/**, tests/**, CMakeLists.txt, README.md
@@ -121,10 +135,54 @@ Apron's own plan, in the format described in `docs/agent-protocol.md`.
   done-when: project.toml and policy.toml are gone and nothing reads them; tasks.md keys are English only; `apron projects`, `apron scope` and the Review tab are gone with what they showed still reachable; settings.json calls `apron hook`; AGENTS.md points to docs/agent-protocol.md; every test passes
   checks: build, test
 
-## Release
-
 - [x] T21 Ready to be public: Apache-2.0 license, trademark policy, contributing and security guides, repository description and topics
   scope: LICENSE, NOTICE, TRADEMARKS.md, CONTRIBUTING.md, SECURITY.md, README.md, .github/**
   depends: T19
   done-when: the files are in the repository, README links them, and the GitHub repository has a product description and topics; visibility stays a person's choice
+  checks: build, test
+
+- [ ] T23 `apron run finish` refuses files outside the task's scope unless the agent passes `--outside "reason"`, which the run records
+  scope: src/cli/**, src/core/**, tests/**, docs/**, AGENTS.md, integrations/**
+  depends: T19
+  done-when: finishing with files outside the scope fails with the list; with --outside it passes and the reason shows in the log and the review
+  checks: build, test
+
+- [ ] T24 Agents survive an upgrade of aprond: the new daemon takes over the running sessions' terminals instead of closing them
+  scope: src/daemon/**, src/proto/**, src/cli/**, tests/**, docs/**
+  depends: T6
+  done-when: replacing the aprond binary and restarting it keeps every session alive and attachable, with its replay
+  checks: build, test
+
+- [ ] T25 `apron brief`: the project's memory for the agent that starts, from notes, review comments and decisions, within a line budget
+  scope: src/cli/**, src/core/**, tests/**, docs/**, AGENTS.md
+  depends: T19
+  done-when: `apron brief [task]` prints the notes of every run, the review comments and the task's decision within a budget of lines, and AGENTS.md tells agents to read it first
+  checks: build, test
+
+- [ ] T26 Worktrees and best of N: a run can live in its own git worktree, and several attempts at one task can run side by side with the checks picking the winner
+  scope: src/cli/**, src/core/**, src/tui/**, tests/**, docs/**
+  depends: T23
+  done-when: `apron run start --worktree` and `--attempts N` work, and the review shows the attempts side by side with their checks
+  checks: build, test
+
+- [ ] T27 Tokens and cost per run, from the agents' telemetry
+  scope: src/**, tests/**, docs/**, integrations/**
+  depends: T20
+  done-when: a Claude Code run shows its tokens and cost on its card, in the log and in the review
+  checks: build, test
+
+## v0c · Auto
+
+The agent settles as many decisions as it can on its own.
+
+- [ ] T28 Auto mode: a project in auto merges a finished run when every declared check passes and nothing left the scope; only decisions reach the person
+  scope: src/**, tests/**, docs/**
+  depends: T23, T26
+  done-when: a project switched to auto by the person merges passing runs on its own, records why in Activity, and still stops at every ask
+  checks: build, test
+
+- [ ] T29 Push with a time window: in auto, merged work is pushed after a delay the person can cancel
+  scope: src/**, tests/**, docs/**
+  depends: T28
+  done-when: an auto merge is pushed after the window unless the person cancels it from the screen
   checks: build, test

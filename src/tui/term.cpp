@@ -7,6 +7,7 @@
 
 #include <atomic>
 #include <csignal>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 
@@ -18,8 +19,9 @@ termios g_saved{};
 bool g_active = false;
 std::atomic<bool> g_resized{false};
 
-constexpr const char* kEnter = "\x1b[?1049h\x1b[?25l\x1b[?7l\x1b[2J";
-constexpr const char* kLeave = "\x1b[0m\x1b[?7h\x1b[?25h\x1b[?1049l";
+// Alternate screen, no cursor, no wrap, and mouse clicks reported as SGR (1000 + 1006).
+constexpr const char* kEnter = "\x1b[?1049h\x1b[?25l\x1b[?7l\x1b[?1000h\x1b[?1006h\x1b[2J";
+constexpr const char* kLeave = "\x1b[0m\x1b[?1006l\x1b[?1000l\x1b[?7h\x1b[?25h\x1b[?1049l";
 
 void restore() {
   if (!g_active) return;
@@ -110,11 +112,27 @@ KeyEvent Terminal::poll(int timeout_ms) {
     return {Key::Resize, 0, ""};
   }
   if (r <= 0) return {};
-  char buf[16];
+  char buf[64];
   ssize_t n = ::read(STDIN_FILENO, buf, sizeof buf);
   if (n <= 0) return {};
   if (buf[0] == '\x1b') {
     if (n == 1) return {Key::Esc, 0, ""};
+    // SGR mouse: ESC [ < button ; column ; row M (press) or m (release).
+    if (n >= 6 && buf[1] == '[' && buf[2] == '<') {
+      int b = 0, cx = 0, cy = 0;
+      char end = 0;
+      if (std::sscanf(buf + 3, "%d;%d;%d%c", &b, &cx, &cy, &end) == 4 && end == 'M') {
+        KeyEvent e;
+        e.x = cx - 1;
+        e.y = cy - 1;
+        if (b == 64) e.key = Key::WheelUp;
+        else if (b == 65) e.key = Key::WheelDown;
+        else if ((b & 3) == 0 && b < 32) e.key = Key::Click;  // left button, no drag
+        return e;
+      }
+      return {};
+    }
+    if (n >= 3 && buf[1] == '[' && buf[2] == 'Z') return {Key::BackTab, 0, ""};
     if (n >= 3 && (buf[1] == '[' || buf[1] == 'O')) {
       switch (buf[2]) {
         case 'A': return {Key::Up, 0, ""};

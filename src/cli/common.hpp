@@ -65,8 +65,12 @@ int cmd_review(const Args& args);
 int cmd_machines(const Args& args);
 int cmd_proxy(const Args& args);
 
-// Attaches this terminal to a session of the local aprond until Ctrl-] or exit.
-int attach_session(uint32_t id);
+// Attaches this terminal to a session until Ctrl-] or exit; `host` "" is this machine.
+int attach_session(const std::string& host, uint32_t id);
+// Starts a shell session in `cwd` on `host`, types `input` into it, and returns its id (0 on failure).
+uint32_t spawn_session(const std::string& host, const std::string& cwd, const std::string& input, std::string* error);
+// Ends a session on `host`.
+bool kill_session(const std::string& host, uint32_t id, std::string* error);
 
 // Files a run touched since its base commit, checked against the task's scope.
 ScopeReport measure_scope(const Project& project, const std::vector<Event>& events);

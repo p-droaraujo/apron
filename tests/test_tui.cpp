@@ -56,19 +56,19 @@ TEST("progress: tasks and runs land in the right lanes") {
   {
     std::ofstream(root / ".apron" / "tasks.md") << R"(## v0a
 - [x] T1 Eventos
-  escopo: src/**
-  pronto: sim
+  scope: src/**
+  done-when: sim
 - [ ] T2 Tarefas
-  escopo: src/**
-  depende: T1
-  pronto: sim
+  scope: src/**
+  depends: T1
+  done-when: sim
 - [ ] T3 Depende
-  escopo: src/**
-  depende: T2
-  pronto: sim
+  scope: src/**
+  depends: T2
+  done-when: sim
 - [ ] T4 Pergunta
-  escopo: src/**
-  pronto: sim
+  scope: src/**
+  done-when: sim
 )";
   }
   Project p{root};

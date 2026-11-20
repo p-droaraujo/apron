@@ -114,3 +114,9 @@ Apron's own plan, in the format described in `docs/agent-protocol.md`.
   depends: T3, T4
   done-when: checks get APRON_RUN, APRON_TASK, APRON_TASK_TEXT and APRON_BASE; `integrations/verify/apron-verify.sh [focus]` passes or fails on the agent's verdict, with any agent command; `apron run start` warns and records a note when its scope overlaps a run still in progress
   checks: build, test
+
+- [x] T19 Cut the fat: two files in .apron/, English task keys, free-text blocked, one `machines` command for every project, scope inside `log`, no Review tab, the hook called directly, one source for the protocol
+  scope: src/**, tests/**, integrations/**, docs/**, AGENTS.md, README.md, .apron/**, .claude/**, CMakeLists.txt
+  depends: T18
+  done-when: project.toml and policy.toml are gone and nothing reads them; tasks.md keys are English only; `apron projects`, `apron scope` and the Review tab are gone with what they showed still reachable; settings.json calls `apron hook`; AGENTS.md points to docs/agent-protocol.md; every test passes
+  checks: build, test

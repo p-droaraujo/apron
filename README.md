@@ -1,118 +1,122 @@
-# apron
+# Apron
 
-A terminal control panel for AI coding agents across all your machines.
+**One screen for every AI coding agent on every machine you own.**
 
-The apron is where aircraft park, refuel and get checked between flights. Apron does the same for AI agents: it shows every agent, project and machine on one screen, measures what each agent did, and takes you to the right terminal in one keystroke. You control agents in their terminals; Apron watches, measures and tells you when something needs you.
-
-> Early days. Apron is being built by an AI agent, with Apron itself: every task in this repository is planned in `.apron/tasks.md` and reported through `apron report`.
-
-## What works today
-
-`apron` with no arguments opens the progress view: four lanes (plan, running, gates, done) built from `.apron/tasks.md` and the run events, refreshing as agents report. Arrows or hjkl move, Enter opens a run's timeline or a task's fields, `q` quits. It reads local files; the view across machines comes with T10.
+Run Claude Code, Codex or Pi on your laptop, your home server and your build box. Apron shows what each one is doing, which ones are waiting for you, and what they changed, and takes you to the right agent's terminal in one keystroke. The agents keep working when you close the screen, put the laptop to sleep or lose the connection.
 
 ```
- shop · mac                                                                            20:52 UTC
+ shop · mac                                                                            20:52
  PLAN 2                        RUNNING 3                     GATES 1                     DONE 1
  ───────────────────────────   ───────────────────────────   ─────────────────────────   ──────────────────────
- ◌ S5 Load tests        ← S4   ▌ ● pi@nexus          9m20s   ▌ ◐ codex@mac        9m20s   ✓ S1 Price parser   9m
+ ◌ S5 Load tests        ← S4   ▌ ● pi@nexus     ⌨ 9m20s     ▌ ◐ codex@mac        9m20s   ✓ S1 Price parser   9m
  ◌ S7 Rate limit per c… ← S6   ▌ S6 JSON logs                ▌ S3 Email confirmation   
                                ▌ JSON format defined; rep…   ▌ change the confirmation…
  APRON  ◐ 1  ● 2  ⊘ 1                                                                        ? help
 ```
 
-The interface is in English, with Brazilian Portuguese as the second language: set `APRON_LANG=pt-BR`, or let Apron follow the system locale. `tasks.md` accepts its keys in either language (`scope` or `escopo`, `done-when` or `pronto`).
+> **Early release.** Apron works, and Apron is built with Apron, but it is young: expect rough edges and breaking changes. Linux and macOS.
 
-Under it, the event layer: an agent starts a run, narrates it in short structured events, and finishes it.
+## Why Apron
+
+- **Agents in terminals, not in a new IDE.** You keep the agents and the terminal you already use. Apron watches and measures; the control stays in the terminal.
+- **Many machines, no server.** Every machine runs a small daemon; machines reach each other over plain SSH. No account, no cloud, no hub to keep running.
+- **Work you can review.** Each task declares the files it may touch and what "done" means. Apron measures what an agent actually changed, runs your checks, and puts finished work in front of you to merge, return with a comment, or discard.
+- **Small and fast.** Two binaries under 2 MB, written in C++20 with no dependencies. The screen uses under 1% CPU with hundreds of runs.
+
+## What works today
+
+| | |
+| --- | --- |
+| **Progress board** | Plan, Running, Gates, Done, built from your tasks and the agents' reports, refreshed every second |
+| **Sessions that outlive your terminal** | Start an agent in a session kept by `aprond`; detach, close the laptop, attach again later |
+| **One keystroke to the agent** | Enter on a running card opens that agent's terminal; Ctrl-] brings you back |
+| **Machines over SSH** | Sessions and activity of every machine you can `ssh` into |
+| **Review** | Failing checks and scope drift first; merge, return or discard from the board |
+| **Activity** | One timeline of everything every agent did, newest first |
+| **Scope meter** | Which changed files are outside what the task allowed |
+| **Checks, verifier and reviewer team** | Your build and tests, plus a fresh read-only agent that judges the diff against the task |
+| **Claude Code hooks** | Claude Code reports reading, editing, testing and waiting for you by itself |
+| **English and Portuguese** | Follows the system language, or `APRON_LANG` |
+
+## Install
+
+Apron builds from source in about a minute. You need a C++20 compiler (GCC 13+ or Clang 16+), CMake 3.25+ and Ninja; on a Mac, `xcode-select --install` and `brew install cmake ninja`.
 
 ```sh
+git clone https://github.com/p-droaraujo/apron && cd apron
 cmake -S . -B build -G Ninja && cmake --build build
-./build/apron run start T2 --agent claude --intent "parse and update tasks.md"
-./build/apron report step "parser reads ids, state and fields"
-./build/apron report ask "should abandoned tasks stay in the file?"
-./build/apron run finish --result done "parser and writer done; review the state markers first"
-./build/apron log
+cmake --install build --prefix ~/.local --strip      # apron and aprond in ~/.local/bin
 ```
 
+Do the same on every machine where agents will run. A Homebrew tap is planned.
+
+## Quick start
+
+```sh
+cd ~/code/my-project
+apron new -- claude          # an agent in a session that survives your terminal
 ```
-T2 · claude@nexus · 12m04s · ✓ feita
 
-  0s      ▶ iniciou      parse and update tasks.md
-  41s     · passo        parser reads ids, state and fields
-  3m10s   ◐ pergunta     should abandoned tasks stay in the file?
-  12m04s  ■ terminou     done · parser and writer done; review the state markers first
+Detach with Ctrl-], then open the board:
+
+```sh
+apron                        # arrows move, Enter opens, ? shows the keys, q quits
 ```
 
-## Builder, verifier and lanes
+To follow other machines, add them by the name you use with `ssh`:
 
-A check can call an agent. `integrations/verify/apron-verify.sh` gives a fresh agent, which cannot write, the task and the diff of the run, and passes or fails on its verdict. A focus makes it one reviewer of a team:
+```sh
+apron machines add nexus     # Apron must be installed there; ssh must work without a password prompt
+```
+
+## Plan the work, and let agents report it
+
+Agents work on tasks from `.apron/tasks.md`, a plain Markdown file in your repository:
+
+```markdown
+- [ ] T6 Minimal daemon keeps sessions and answers sessions.list
+  scope: src/daemon/**, tests/daemon/**
+  depends: T1
+  done-when: `aprond` starts, `apron new` creates a PTY and `apron ls` lists it
+  checks: build, test
+```
+
+An agent picks a task, narrates it in one-line events (`apron report step "..."`, `apron report ask "..."`), runs the checks and closes the run. Apron turns that into the board, the timeline, the scope meter and the review. Put [`AGENTS.md`](AGENTS.md) in your repository and any agent that reads project instructions learns how; the full protocol is in [`docs/agent-protocol.md`](docs/agent-protocol.md).
+
+Checks live in `.apron/checks.toml`:
 
 ```toml
 [[check]]
-name = "verify"
-run  = "integrations/verify/apron-verify.sh"            # or: ... security, ux, simplicity, edge-cases
+name = "test"
+run  = "ctest --test-dir build"
+
+[[check]]
+name = "verify"                                  # a fresh agent that cannot write judges the diff
+run  = "integrations/verify/apron-verify.sh"     # add a focus for a reviewer: security, ux, simplicity, edge-cases
 timeout = 900
 ```
 
-```sh
-apron check verify                                                   # after the work, before finish
-apron check review-ux review-simplicity review-edge-cases review-security   # the team, before a merge
-```
+With the hooks in [`integrations/claude-code/`](integrations/claude-code/), Claude Code reports its own state, and closes its run before it ends its turn.
 
-The default agent is `claude -p` without its writing tools; set `APRON_VERIFY_AGENT` for another (it reads the prompt on stdin). Checks get `APRON_RUN`, `APRON_TASK`, `APRON_TASK_TEXT` and `APRON_BASE`, so your own checks can judge a run too.
+## Many machines
 
-Lanes: `apron run start` warns, and notes it in the run, when the task's scope meets the scope of a run still in progress. Parallel runs are for work that divides cleanly by folder.
-
-## Review
-
-Finished runs wait in Gates until you review them. `v` opens the Review tab: failing checks and scope drift first; Enter shows the trajectory, the checks, the scope and the changed files; `m` merges into `main`, `r` returns the run with a comment the next agent reads, `d` discards it. `apron review` does the same from the shell.
-
-Enter on a running card marked ⌨ takes over the agent's terminal (the run was started inside an `apron new` session on this machine); Ctrl-] brings you back to the board. `o` opens the run's log instead.
-
-`y` opens the Activity tab: one timeline of every project on the machine that `aprond` knows, newest first.
-
-## Sessions that outlive your terminal
-
-`aprond` keeps terminal sessions alive on each machine; `apron` starts it on demand.
+Every machine runs its own `aprond`, which keeps the sessions and the events. When you open Apron, it reaches the others through `ssh <host> apron proxy`. There is no hub, token or certificate: if `ssh nexus` works, Apron works, and Apron can do on that machine exactly what your SSH login can. Keys, an SSH agent, ProxyJump and Tailscale SSH all work as they do today.
 
 ```sh
-./build/apron new -d -- claude      # a session running an agent, in the background
-./build/apron ls                    # ● 1  claude   3m  ~/code/shop
-./build/apron attach 1              # take over its terminal; Ctrl-] detaches, the agent keeps going
-./build/apron kill 1
-./build/apron projects              # every project on this machine, with its runs
+apron machines                    # every machine, reachable or not, with what runs there
+apron attach nexus:3              # take over session 3 on nexus; Ctrl-] detaches
 ```
 
-## Other machines, over SSH
+## Status and roadmap
 
-Every machine runs its own `aprond`. Another machine reaches it through `ssh <host> apron proxy`, which carries the same protocol over SSH. There is no hub, token or certificate: if `ssh nexus` works without a password prompt (keys, an agent, or Tailscale SSH), Apron works, and the access Apron has there is the access your SSH login has.
+Apron is planned in the open, in [`.apron/tasks.md`](.apron/tasks.md), and built by AI agents through Apron itself: every commit carries the timeline of the run that produced it.
 
-```sh
-apron machines add nexus            # a host from ~/.ssh/config; Apron must be installed there
-apron machines add buildbox ~/.local/bin/apron   # when apron is not on the PATH of a non-interactive ssh
-apron machines                      # each machine, reachable or not, with what runs there
-apron ls nexus                      # its sessions
-apron attach nexus:3                # take over session 3 on nexus; Ctrl-] detaches
-apron machines rm buildbox
-```
+Next: sessions and machines inside the screen (fewer commands to remember), agents that survive an upgrade of `aprond`, a project memory every agent reads at the start, git worktrees for parallel attempts, and token and cost tracking.
 
-The list lives in `~/.config/apron/machines`, one host per line. `APRON_SSH` replaces the `ssh` command (the tests use it).
+## Contributing
 
-## Claude Code reports by itself
+Issues and ideas are welcome. Read [`CONTRIBUTING.md`](CONTRIBUTING.md) before a pull request: work here goes through tasks and runs, like the agents' work.
 
-With the hooks in [`integrations/claude-code/`](integrations/claude-code/) (already on in this repository), Claude Code tells Apron when it reads, edits, builds or tests, when it waits for you, and it closes its run before ending its turn.
+## License
 
-## How it fits together
-
-- `aprond` — a daemon on each machine that owns terminals and agents.
-- `apron proxy` — what `ssh <host>` runs to reach that machine's `aprond`; machines talk over SSH only.
-- `apron` — the TUI, in any modern terminal (Ghostty recommended).
-
-Design docs are in Portuguese for now:
-
-- [`docs/agent-protocol.md`](docs/agent-protocol.md) — how an agent works on a project end to end and what it reports.
-- [`AGENTS.md`](AGENTS.md) — the short version, read by any agent that opens this repository.
-- [`.apron/tasks.md`](.apron/tasks.md) — the plan.
-
-## Requirements
-
-C++20 (GCC 13+ or Clang 16+), CMake 3.25+, Ninja. Builds are optimized (Release) unless you pass `-DCMAKE_BUILD_TYPE=Debug`; an existing `build/` keeps the type it was configured with, so run `cmake -S . -B build -DCMAKE_BUILD_TYPE=Release` once. Linux or macOS (on a Mac: `xcode-select --install` and `brew install cmake ninja`). No other dependencies yet.
+Apache License 2.0; see [`LICENSE`](LICENSE). The Apron name, logo and look are not covered by the license; see [`TRADEMARKS.md`](TRADEMARKS.md).

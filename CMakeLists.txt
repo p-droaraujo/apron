@@ -88,3 +88,6 @@ target_link_libraries(apron_tests PRIVATE apron_tui apron_proto)
 add_dependencies(apron_tests aprond apron)
 target_compile_definitions(apron_tests PRIVATE APRON_SOURCE_DIR="${CMAKE_SOURCE_DIR}" APRON_BINARY_DIR="${CMAKE_BINARY_DIR}")
 add_test(NAME core COMMAND apron_tests)
+
+# cmake --install build --prefix ~/.local   puts apron and aprond side by side in ~/.local/bin
+install(TARGETS apron aprond RUNTIME DESTINATION bin)

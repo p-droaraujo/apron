@@ -10,11 +10,11 @@ An Apron project is a git repository with an `.apron/` folder:
 
 | File | Versioned | What for |
 | --- | --- | --- |
-| `.apron/project.toml` | yes | Name, language, mode (manual or auto), decision paths |
 | `.apron/tasks.md` | yes | The plan: tasks, scope, dependencies, done-when |
 | `.apron/checks.toml` | yes | Commands that tell whether the work is good |
-| `.apron/policy.toml` | yes | What an agent may do without asking |
 | `.apron/runs/` | no | Events of each run, one file per run |
+
+That is all the configuration there is. `apron` finds the project by walking up from the current folder to the first `.apron/`.
 
 Everything that belongs to the project lives in the repository and changes by commit. Run events belong to the machine and stay out of git.
 
@@ -44,40 +44,40 @@ The mark between brackets is the state:
 
 Fields:
 
-| Field | Portuguese alias | Required | Meaning |
-| --- | --- | --- | --- |
-| `scope` | `escopo` | yes | Globs of the files the task may touch; anything outside is scope drift |
-| `done-when` | `pronto` | yes | The verifiable criterion for done, in one sentence |
-| `depends` | `depende` | no | Ids that must be done first |
-| `checks` | `checks` | no | Check names; without the field, all checks run |
-| `decision` | `decisão` | no | Why this task needs a person (turns into ◐ when it ends) |
-| `by` | `por` | no | Written by Apron when someone picks the task up |
-| `review` | `revisão` | no | Written by Apron when a person returns a run: what the next agent must change |
+| Field | Required | Meaning |
+| --- | --- | --- |
+| `scope` | yes | Globs of the files the task may touch; anything outside is scope drift |
+| `done-when` | yes | The verifiable criterion for done, in one sentence |
+| `depends` | no | Ids that must be done first |
+| `checks` | no | Check names; without the field, all checks run |
+| `decision` | no | Why this task needs a person |
+| `by` | no | Written by Apron when someone picks the task up |
+| `review` | no | Written by Apron when a person returns a run: what the next agent must change |
 
-Both spellings are read the same way. When Apron writes a field, it uses the language the task is already written in, so a file never mixes the two.
+Keys are English, like the keys of any file format; titles and values can be in any language.
 
 A task without `scope` or `done-when` cannot be picked up: Apron refuses `run start` and says what is missing. That is the minimum contract for work to be reviewable.
 
 ## 3. The life of a run
 
 ```
-apron run start T6 --intent "..."      →  [~] in tasks.md, worktree, run.started event
+apron run start T6 --intent "..."      →  [~] in tasks.md, run.started event
 apron report step "..."                 →  trajectory
 apron report ask "..."                  →  ◐ waiting for you; [?] in tasks.md
-apron report blocked "..."              →  ⊘ no power, with the cause
+apron report blocked "..."              →  ⊘ no power, with the reason
 apron report note "..."                 →  a lesson the next run should know
 apron check                             →  runs the checks, one check event per command
 apron run finish --result done "..."    →  [x], summary, goes to Review
 git commit (with Apron-Run: <id>)       →  tasks.md and code change together
 ```
 
-Then a person reviews the run (the Review tab, or `apron review`): **merge** fast-forwards `main` to the run's commit and never merges over a `main` that moved on; **return** reopens the task with the person's comment in its `review` field; **discard** reopens the task and deletes nothing.
+Then a person reviews the run (Enter on its card in Gates, or `apron review`): **merge** fast-forwards `main` to the run's commit and never merges over a `main` that moved on; **return** reopens the task with the person's comment in its `review` field; **discard** reopens the task and deletes nothing.
 
 The commit comes after `finish`, because `finish` changes the state in `tasks.md`. The `Apron-Run` trailer links the commit to the run, and the commit body carries the summary: events stay out of git, but the story of the work survives the push.
 
 Every command writes one event and returns in under 10 ms. None of them blocks the agent.
 
-The file in `.apron/runs/` is always the source. If the machine's `aprond` is running, the CLI also tells it about the event, without waiting for an answer; that is how the daemon knows every project on the machine (`apron projects`). With the daemon down, nothing is lost.
+The file in `.apron/runs/` is always the source. If the machine's `aprond` is running, the CLI also tells it about the event, without waiting for an answer; that is how the daemon knows every project on the machine. With the daemon down, nothing is lost.
 
 ### Parallel runs: lanes
 
@@ -104,7 +104,7 @@ One JSON line per event in `.apron/runs/<run>.jsonl`:
 | `run.started` | On picking up a task | `intent`, `base` (commit), `session` (if inside one) | A card in Running, ● |
 | `step` | On changing work phase | — | A point on the trajectory |
 | `ask` | A decision is needed | — | ◐ and a card in Gates |
-| `blocked` | Something outside stops progress | `cause` (gpu, budget, lock, machine, other) | ⊘ with the cause |
+| `blocked` | Something outside stops progress | — | ⊘ with the reason |
 | `note` | Something the next run should know | — | A line in the session log |
 | `check` | A check ran | `name`, `ok`, `ms` | The checks instrument |
 | `run.finished` | On finishing | `result` (done, failed, abandoned) | The card waits in Gates for review |
@@ -113,7 +113,7 @@ One JSON line per event in `.apron/runs/<run>.jsonl`:
 Writing rules for the agent:
 
 - One sentence per event, present tense, saying what changed: "tasks.md parser passes its tests", not "working on the parser".
-- Write in the project's language (`language` in `project.toml`).
+- Write in the language the project's people read; this repository uses English.
 - A `step` on each change of phase (read, plan, edit, test, fix), not on each command. Three to ten per run.
 - `ask` only for what is a person's decision: business rules, anything customer-facing, architecture, scope. Technical doubts the agent solves itself.
 - If staying inside the `scope` forces a worse design, that is an `ask` too: say which better design needs which extra paths, and let the person choose.
@@ -134,11 +134,12 @@ Writing rules for the agent:
 
 The agent reports none of this; Apron takes it from git, telemetry and the clock:
 
-- files and lines changed, and what left the `scope` (`.apron/tasks.md` never counts: Apron itself writes the task state there);
+- files changed, and what left the `scope` (`.apron/tasks.md` never counts: Apron itself writes the task state there);
 - duration of the run and of each step;
-- tokens and cost (OpenTelemetry) or GPU time (local model);
 - check results, when they run through `apron check`.
+
+Tokens and cost (OpenTelemetry) are planned, not built yet.
 
 ## 7. Languages
 
-The interface is in English by default, with Brazilian Portuguese as the second language. `APRON_LANG` (`en` or `pt-BR`) chooses; without it, Apron follows the system locale and falls back to English. Code, comments, commits and these docs are in English. What agents write in events follows the project's `language`.
+The interface is in English by default, with Brazilian Portuguese as the second language. `APRON_LANG` (`en` or `pt-BR`) chooses; without it, Apron follows the system locale and falls back to English. Code, comments, commits and these docs are in English. Sentences written by the Claude Code hooks follow the machine's language, like the interface.

@@ -83,7 +83,7 @@ Runs (docs/agent-protocol.md):
   apron run finish [--result done|failed|abandoned] "summary"
   apron run current
   apron report step|ask|note "sentence"
-  apron report blocked --cause gpu|budget|lock|machine|other "sentence"
+  apron report blocked "sentence"
   apron log [run]               timeline of a run (default: the current or the latest)
   apron check [names...]        run checks.toml and record the results in the current run
   apron scope [run]             files the run touched, and which left the task's scope

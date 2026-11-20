@@ -55,7 +55,6 @@ void print_event(const Style& st, const Event& e, int64_t start) {
     case Kind::Blocked:
       glyph = st.dim("⊘");
       text = tr("no power");
-      msg = "(" + e.extra_str("cause") + ") " + msg;
       break;
     case Kind::Note: glyph = st.dim("›"); text = tr("note"); break;
     case Kind::Check: {

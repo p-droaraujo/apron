@@ -35,12 +35,6 @@ int cmd_report(const Args& args) {
   e.machine = machine_name();
   e.kind = *kind;
   e.msg = msg;
-  if (*kind == Kind::Blocked) {
-    std::string cause = args.get("cause", "other");
-    if (cause != "gpu" && cause != "budget" && cause != "lock" && cause != "machine" && cause != "other")
-      return fail(tr("--cause must be gpu, budget, lock, machine or other"));
-    e.extra.emplace_back("cause", cause);
-  }
   std::string err;
   if (!record(*project, e, &err)) return fail(err);
   // An ask moves the task to [?]; the next step moves it back to [~].

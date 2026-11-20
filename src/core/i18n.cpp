@@ -46,8 +46,8 @@ const std::unordered_map<std::string_view, std::string_view>& pt_br() {
       {"could not put the terminal in raw mode", "não consegui colocar o terminal em modo cru"},
 
       // Tasks.
-      {"missing the scope field", "falta o campo escopo"},
-      {"missing the done-when field", "falta o campo pronto"},
+      {"missing the scope field", "falta o campo scope"},
+      {"missing the done-when field", "falta o campo done-when"},
       {"already in progress ({})", "já está em andamento ({})"},
       {"already done", "já está feita"},
       {"was abandoned", "foi abandonada"},
@@ -81,8 +81,6 @@ const std::unordered_map<std::string_view, std::string_view>& pt_br() {
       {"a report needs a sentence", "o relato precisa de uma frase"},
       {"no run in progress; start one with apron run start <task>",
        "nenhuma execução em curso; comece com apron run start <tarefa>"},
-      {"--cause must be gpu, budget, lock, machine or other",
-       "--cause precisa ser gpu, budget, lock, machine ou other"},
       {"no runs in this project yet", "nenhuma execução neste projeto ainda"},
       {"no runs yet", "nenhuma execução ainda"},
       {"warning: skipped line in {}", "aviso: linha ignorada em {}"},
@@ -164,7 +162,7 @@ Runs (docs/agent-protocol.md):
   apron run finish [--result done|failed|abandoned] "summary"
   apron run current
   apron report step|ask|note "sentence"
-  apron report blocked --cause gpu|budget|lock|machine|other "sentence"
+  apron report blocked "sentence"
   apron log [run]               timeline of a run (default: the current or the latest)
   apron check [names...]        run checks.toml and record the results in the current run
   apron scope [run]             files the run touched, and which left the task's scope
@@ -193,7 +191,7 @@ Execuções (docs/agent-protocol.md):
   apron run finish [--result done|failed|abandoned] "resumo"
   apron run current
   apron report step|ask|note "frase"
-  apron report blocked --cause gpu|budget|lock|machine|other "frase"
+  apron report blocked "frase"
   apron log [execução]          linha do tempo de uma execução (padrão: a atual ou a última)
   apron check [nomes...]        roda o checks.toml e grava os resultados na execução atual
   apron scope [execução]        arquivos que a execução tocou, e os que saíram do escopo

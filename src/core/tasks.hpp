@@ -19,9 +19,6 @@ inline constexpr std::string_view kDecision = "decision";
 inline constexpr std::string_view kBy = "by";
 inline constexpr std::string_view kReview = "review";
 
-// "escopo" -> "scope"; an English or unknown key comes back unchanged.
-std::string_view canonical_key(std::string_view key);
-std::string_view portuguese_key(std::string_view canonical);
 
 struct Task {
   std::string id;       // T2
@@ -32,10 +29,9 @@ struct Task {
   size_t line = 0;       // index of the task line
   size_t last_line = 0;  // last line that belongs to the task (a field or the task itself)
 
-  // Value of a field by canonical key, whatever language it was written in.
-  std::string field(std::string_view canonical) const;
+  // Value of a field by its key (keys are English: scope, done-when...).
+  std::string field(std::string_view key) const;
   std::vector<std::string> depends() const;  // ids in `depends`, without "—"
-  bool written_in_portuguese() const;
 };
 
 class TaskFile {

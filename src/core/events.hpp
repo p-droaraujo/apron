@@ -25,7 +25,7 @@ struct Event {
   std::string machine;
   Kind kind = Kind::Step;
   std::string msg;
-  json::Object extra;  // intent, cause, name, ok, ms, result...
+  json::Object extra;  // intent, name, ok, ms, result...
 
   json::Value to_json() const;
   static std::optional<Event> from_json(const json::Value& value, std::string* error = nullptr);

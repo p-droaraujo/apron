@@ -1,6 +1,5 @@
 #include "core/tasks.hpp"
 
-#include <array>
 #include <fstream>
 #include <sstream>
 
@@ -10,15 +9,6 @@ namespace apron {
 
 namespace {
 
-constexpr std::array<std::pair<std::string_view, std::string_view>, 7> kAliases{{
-    {"scope", "escopo"},
-    {"done-when", "pronto"},
-    {"depends", "depende"},
-    {"checks", "checks"},
-    {"decision", "decisão"},
-    {"by", "por"},
-    {"review", "revisão"},
-}};
 
 std::string trim(std::string_view s) {
   size_t a = 0, b = s.size();
@@ -63,28 +53,10 @@ bool parse_field_line(std::string_view line, size_t task_indent, std::string& ke
 
 }  // namespace
 
-std::string_view canonical_key(std::string_view key) {
-  for (auto [en, pt] : kAliases)
-    if (key == en || key == pt) return en;
-  return key;
-}
-
-std::string_view portuguese_key(std::string_view canonical) {
-  for (auto [en, pt] : kAliases)
-    if (canonical == en) return pt;
-  return canonical;
-}
-
-std::string Task::field(std::string_view canonical) const {
+std::string Task::field(std::string_view key) const {
   for (const auto& [k, v] : fields)
-    if (canonical_key(k) == canonical) return v;
+    if (k == key) return v;
   return "";
-}
-
-bool Task::written_in_portuguese() const {
-  for (const auto& [k, v] : fields)
-    if (k != "checks" && canonical_key(k) != k) return true;
-  return false;
 }
 
 std::vector<std::string> Task::depends() const {
@@ -164,7 +136,7 @@ bool TaskFile::set_field(std::string_view id, std::string_view canonical, std::s
   size_t task_indent = indent_of(lines_[t->line]);
   for (size_t j = t->line + 1; j <= t->last_line; ++j) {
     std::string k, v;
-    if (parse_field_line(lines_[j], task_indent, k, v) && canonical_key(k) == canonical) {
+    if (parse_field_line(lines_[j], task_indent, k, v) && k == canonical) {
       if (value.empty()) lines_.erase(lines_.begin() + static_cast<long>(j));
       else lines_[j] = lines_[j].substr(0, indent_of(lines_[j])) + k + ": " + std::string(value);
       reparse();
@@ -172,10 +144,9 @@ bool TaskFile::set_field(std::string_view id, std::string_view canonical, std::s
     }
   }
   if (value.empty()) return true;
-  std::string_view key = t->written_in_portuguese() ? portuguese_key(canonical) : canonical;
   std::string indent(task_indent + 2, ' ');
   lines_.insert(lines_.begin() + static_cast<long>(t->last_line + 1),
-                indent + std::string(key) + ": " + std::string(value));
+                indent + std::string(canonical) + ": " + std::string(value));
   reparse();
   return true;
 }

@@ -82,15 +82,6 @@ std::string tool_phase(const std::string& tool, const json::Value& input) {
   return "";
 }
 
-// Hook sentences are part of the run, so they follow the project's language.
-bool project_in_portuguese(const Project& p) {
-  std::ifstream in(p.apron_dir() / "project.toml");
-  std::string line;
-  while (std::getline(in, line))
-    if (line.find("language") != std::string::npos && line.find("\"pt") != std::string::npos) return true;
-  return false;
-}
-
 }  // namespace
 
 int cmd_hook(const Args& args) {
@@ -109,10 +100,10 @@ int cmd_hook(const Args& args) {
   auto events = load_events(project->run_file(*run));
   if (events.empty()) return 0;
   Kind last = events.back().kind;
-  bool pt = project_in_portuguese(*project);
+  bool pt = i18n::current() != i18n::Lang::En;  // the machine's language, like the interface
   auto say = [&](const char* en, const char* ptbr) { return std::string(pt ? ptbr : en); };
 
-  auto report = [&](Kind kind, const std::string& msg, const std::string& cause = "") {
+  auto report = [&](Kind kind, const std::string& msg) {
     Event e;
     e.ts_ms = timeutil::now_ms();
     e.run = *run;
@@ -121,7 +112,6 @@ int cmd_hook(const Args& args) {
     e.machine = machine_name();
     e.kind = kind;
     e.msg = msg.size() > 200 ? msg.substr(0, 200) : msg;
-    if (!cause.empty()) e.extra.emplace_back("cause", cause);
     std::string err;
     record(*project, e, &err);
     std::string by = e.agent + "@" + e.machine;
@@ -177,7 +167,7 @@ int cmd_hook(const Args& args) {
                          " is still open. If the task is done, run `apron check` and then `apron run finish --result done "
                          "\"<what was done; what was left out; what to look at first>\"`. If you need a decision from the "
                          "person, run `apron report ask \"<the question>\"`. If something outside stops you, run `apron "
-                         "report blocked --cause <gpu|budget|lock|machine|other> \"<the reason>\"`.";
+                         "report blocked \"<the reason>\"`.";
     json::Object out;
     out.emplace_back("decision", "block");
     out.emplace_back("reason", reason);
@@ -185,8 +175,7 @@ int cmd_hook(const Args& args) {
   } else if (event == "SessionEnd") {
     if (last == Kind::RunFinished || last == Kind::Blocked) return 0;
     report(Kind::Blocked, say("The Claude Code session ends with the run still open.",
-                              "A sessão do Claude Code termina com a execução aberta."),
-           "other");
+                              "A sessão do Claude Code termina com a execução aberta."));
   }
   return 0;
 }

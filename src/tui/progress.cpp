@@ -254,7 +254,7 @@ void render_log(Screen& sc, const Project& project, const std::string& run, int 
       case Kind::RunStarted: g = "▶"; what = tr("started"); msg = e.extra_str("intent"); break;
       case Kind::Step: break;
       case Kind::Ask: g = "◐"; what = tr("question"); gs = ls = ms = kAmber; break;
-      case Kind::Blocked: g = "⊘"; what = tr("no power"); gs = kDim; msg = "(" + e.extra_str("cause") + ") " + msg; break;
+      case Kind::Blocked: g = "⊘"; what = tr("no power"); gs = kDim; break;
       case Kind::Note: g = "›"; what = tr("note"); gs = kDim; ms = kSoft; break;
       case Kind::Check: {
         const json::Value* ok = e.extra_find("ok");
@@ -437,7 +437,7 @@ void render_activity(Screen& sc, const std::vector<ActivityItem>& items, int scr
       case Kind::RunStarted: g = "▶"; msg = e.extra_str("intent"); ms = kText; break;
       case Kind::Step: break;
       case Kind::Ask: g = "◐"; gs = ms = kAmber; break;
-      case Kind::Blocked: g = "⊘"; gs = kDim; msg = "(" + e.extra_str("cause") + ") " + msg; break;
+      case Kind::Blocked: g = "⊘"; gs = kDim; break;
       case Kind::Note: g = "›"; gs = kDim; ms = kDim; break;
       case Kind::Check: {
         const json::Value* ok = e.extra_find("ok");

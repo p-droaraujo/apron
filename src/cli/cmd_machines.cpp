@@ -143,6 +143,15 @@ std::string add_machine(const std::string& host, const std::string& remote) {
   return save_machines(all) ? "" : trf("could not write {}", {machines_file().string()});
 }
 
+std::string remove_machine(const std::string& host) {
+  auto all = load_machines();
+  std::vector<Machine> kept;
+  for (auto& x : all)
+    if (x.host != host) kept.push_back(x);
+  if (kept.size() == all.size()) return trf("no machine {}", {host});
+  return save_machines(kept) ? "" : trf("could not write {}", {machines_file().string()});
+}
+
 int cmd_machines(const Args& args) {
   auto all = load_machines();
   std::string sub = args.pos.empty() ? "" : args.pos[0];
@@ -155,11 +164,8 @@ int cmd_machines(const Args& args) {
   }
   if (sub == "rm") {
     if (args.pos.size() < 2) return fail(tr("usage: apron machines rm <ssh host>"));
-    std::vector<Machine> kept;
-    for (auto& x : all)
-      if (x.host != args.pos[1]) kept.push_back(x);
-    if (kept.size() == all.size()) return fail(trf("no machine {}", {args.pos[1]}));
-    return save_machines(kept) ? 0 : fail(trf("could not write {}", {machines_file().string()}));
+    std::string err = remove_machine(args.pos[1]);
+    return err.empty() ? 0 : fail(err);
   }
   return fail(tr("usage: apron machines [add <ssh host> [apron command there] | rm <ssh host>]"));
 }

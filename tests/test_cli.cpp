@@ -33,9 +33,27 @@ std::string sh(const std::string& cmd) {
   return out;
 }
 
+// One request to a daemon's socket, and its reply.
+std::string ask_daemon(const fs::path& sock, const std::string& request) {
+  int fd = apron::proto::connect_unix(sock);
+  if (fd < 0) return "";
+  apron::proto::write_all(fd, apron::proto::encode({apron::proto::Type::Ctrl, 0, request}));
+  apron::proto::Reader reader;
+  std::string got;
+  char buf[65536];
+  for (int i = 0; i < 50 && got.empty(); ++i) {
+    ssize_t n = read(fd, buf, sizeof buf);
+    if (n <= 0) break;
+    reader.feed(std::string_view(buf, static_cast<size_t>(n)));
+    if (auto f = reader.next()) got = f->payload;
+  }
+  close(fd);
+  return got;
+}
+
 }  // namespace
 
-TEST("cli: a run reported while aprond runs shows up in apron projects, linked to its session") {
+TEST("cli: a run reported while aprond runs shows up in its projects, linked to its session") {
   fs::path dir = fs::temp_directory_path() / ("apron-cli-" + std::to_string(::getpid()));
   fs::remove_all(dir);
   fs::create_directories(dir / "demo" / ".apron");
@@ -47,7 +65,6 @@ TEST("cli: a run reported while aprond runs shows up in apron projects, linked t
 
   // Without a daemon the run still works: the file is the source.
   CHECK(sh(env + apron + " run start D1 --intent demo").find("r-D1-") != std::string::npos);
-  CHECK(sh(env + apron + " projects").find("aprond is not running") != std::string::npos);
 
   pid_t daemon = fork();
   if (daemon == 0) {
@@ -60,9 +77,9 @@ TEST("cli: a run reported while aprond runs shows up in apron projects, linked t
 
   sh(env + apron + " report ask 'may I change the schema?'");
   std::this_thread::sleep_for(std::chrono::milliseconds(100));
-  std::string projects = sh(env + apron + " projects");
+  std::string projects = ask_daemon(dir / "d.sock", R"({"id":1,"cmd":"projects.list"})");
   CHECK(projects.find("demo") != std::string::npos);
-  CHECK(projects.find("◐ 1") != std::string::npos);
+  CHECK(projects.find("\"waiting\":1") != std::string::npos);
   CHECK(projects.find("may I change the schema?") != std::string::npos);
 
   // A run started inside a session records the session it lives in.
@@ -81,7 +98,7 @@ TEST("cli: a run reported while aprond runs shows up in apron projects, linked t
   fs::remove_all(dir);
 }
 
-TEST("cli: machines over ssh: add, list, ls, attach, unreachable, and events.recent") {
+TEST("cli: machines over ssh: add, list, unreachable, events.recent and project.board") {
   fs::path dir = fs::temp_directory_path() / ("apron-ssh-" + std::to_string(::getpid()));
   fs::remove_all(dir);
   fs::create_directories(dir / "demo" / ".apron");
@@ -104,9 +121,7 @@ TEST("cli: machines over ssh: add, list, ls, attach, unreachable, and events.rec
   sh(box + apron + " new -d -- sh -c 'echo REMOTE-OK; exec sleep 30'");
   sh(box + apron + " run start D1 --intent 'over there'");
   std::this_thread::sleep_for(std::chrono::milliseconds(300));
-  CHECK(sh(here + apron + " ls box").find("sleep") != std::string::npos);
   CHECK(sh(here + apron + " machines").find("1 running · 1 projects") != std::string::npos);
-  CHECK(sh(here + apron + " attach box:1 </dev/null").find("REMOTE-OK") != std::string::npos);  // the replay
 
   std::string down = sh(here + apron + " machines add down; echo rc=$?");
   CHECK(down.find("Connection refused") != std::string::npos);

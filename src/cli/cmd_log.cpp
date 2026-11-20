@@ -1,4 +1,4 @@
-// apron log [run] and apron runs
+// apron log [run]: a run's timeline, the text that goes into its commit.
 #include <cstdio>
 
 #include "cli/common.hpp"
@@ -120,27 +120,5 @@ int cmd_log(const Args& args) {
   return 0;
 }
 
-int cmd_runs(const Args&) {
-  auto project = require_project();
-  if (!project) return 1;
-  auto runs = list_runs(*project);
-  if (runs.empty()) {
-    std::puts(tr("no runs yet").c_str());
-    return 0;
-  }
-  Style st;
-  auto current = project->current_run();
-  for (const auto& s : runs) {
-    std::string checks;
-    if (s.checks_ok + s.checks_failed > 0)
-      checks = "checks " + std::to_string(s.checks_ok) + "/" + std::to_string(s.checks_ok + s.checks_failed);
-    if (!s.outside.empty()) checks += (checks.empty() ? "" : " ") + st.amber("✕" + std::to_string(s.outside.size()));
-    std::printf("%s %s %s %s %s %s\n", pad(state_label(st, s.state), 18).c_str(), pad(s.task, 5).c_str(),
-                pad(s.agent + "@" + s.machine, 18).c_str(),
-                st.dim(pad(timeutil::short_duration(s.last_ms - s.started_ms), 7)).c_str(), pad(checks, 11).c_str(),
-                (current && *current == s.id ? st.bold(s.last_msg) : s.last_msg).c_str());
-  }
-  return 0;
-}
 
 }  // namespace apron::cli

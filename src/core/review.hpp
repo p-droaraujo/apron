@@ -1,5 +1,4 @@
-// Review: what a person does with a finished run. Shared by `apron review`
-// and the Review tab.
+// Review: what a person does with a finished run, from its card in Gates.
 #pragma once
 
 #include <string>

@@ -53,7 +53,6 @@ const std::unordered_map<std::string_view, std::string_view>& pt_br() {
       {"unknown command: {} (see apron --help)", "comando desconhecido: {} (veja apron --help)"},
       {"usage: apron run start <task> [--agent name] [--intent \"sentence\"]",
        "uso: apron run start <tarefa> [--agent nome] [--intent \"frase\"]"},
-      {"usage: apron run start|finish|current", "uso: apron run start|finish|current"},
       {"usage: apron report step|ask|blocked|note \"sentence\"",
        "uso: apron report step|ask|blocked|note \"frase\""},
       {"a run is already in progress in this worktree ({}); close it with apron run finish first",
@@ -71,13 +70,10 @@ const std::unordered_map<std::string_view, std::string_view>& pt_br() {
       {"no run in progress; start one with apron run start <task>",
        "nenhuma execução em curso; comece com apron run start <tarefa>"},
       {"no runs in this project yet", "nenhuma execução neste projeto ainda"},
-      {"no runs yet", "nenhuma execução ainda"},
       {"warning: skipped line in {}", "aviso: linha ignorada em {}"},
       {"warning: {}", "aviso: {}"},
-      {"nothing to review", "nada para revisar"},
       {"no activity yet", "nenhuma atividade ainda"},
       {"outside", "fora"},
-      {"usage: apron review [<run> merge|return \"comment\"|discard]", "uso: apron review [<execução> merge|return \"comentário\"|discard]"},
       {"the run has no commit with its Apron-Run trailer yet", "a execução ainda não tem um commit com o trailer Apron-Run"},
       {"main has moved on since this run; rebase its branch onto main first", "o main andou desde esta execução; faça rebase do branch sobre o main antes"},
       {"main has uncommitted changes; commit or stash them first", "o main tem mudanças não commitadas; faça commit ou stash antes"},
@@ -92,9 +88,6 @@ const std::unordered_map<std::string_view, std::string_view>& pt_br() {
       {"changes", "mudanças"},
       {"trajectory", "trajetória"},
       {"no commit yet: uncommitted changes since the run started", "ainda sem commit: mudanças não commitadas desde o início da execução"},
-      {"aprond is not running; projects show up here once a run reports while it runs",
-       "o aprond não está rodando; os projetos aparecem aqui quando uma execução reporta com ele no ar"},
-      {"no projects yet", "nenhum projeto ainda"},
       {"could not start aprond", "não consegui iniciar o aprond"},
       {"aprond did not start; see {}", "o aprond não subiu; veja {}"},
       {"aprond is not running", "o aprond não está rodando"},
@@ -103,10 +96,6 @@ const std::unordered_map<std::string_view, std::string_view>& pt_br() {
       {"no session {}", "a sessão {} não existe"},
       {"[attached; Ctrl-] detaches]", "[anexado; Ctrl-] desanexa]"},
       {"[detached from session {}]", "[desanexado da sessão {}]"},
-      {"no sessions", "nenhuma sessão"},
-      {"exited", "encerrada"},
-      {"usage: apron attach [<machine>:]<session>", "uso: apron attach [<máquina>:]<sessão>"},
-      {"usage: apron kill [<machine>:]<session>", "uso: apron kill [<máquina>:]<sessão>"},
       {"no machines yet; add one with: apron machines add <ssh host>", "nenhuma máquina ainda; adicione com: apron machines add <host ssh>"},
       {"{} running · {} projects", "{} rodando · {} projetos"},
       {"usage: apron machines add <ssh host> [apron command there]", "uso: apron machines add <host ssh> [comando do apron lá]"},
@@ -141,7 +130,6 @@ const std::unordered_map<std::string_view, std::string_view>& pt_br() {
       {"could not start the session", "não foi possível iniciar a sessão"},
       {"discard", "descartar"},
       {"discarded; the task is open again", "descartada; a tarefa está aberta de novo"},
-      {"end session", "encerrar sessão"},
       {"ended", "encerrada"},
       {"keys", "teclas"},
       {"log", "log"},
@@ -156,7 +144,6 @@ const std::unordered_map<std::string_view, std::string_view>& pt_br() {
       {"return with a comment", "devolver com comentário"},
       {"scroll", "rolar"},
       {"seen {} ago", "visto há {}"},
-      {"the screen needs a terminal; outside one, use apron log or apron tasks", "a tela precisa de um terminal; fora de um, use apron log ou apron tasks"},
       {"the session has ended", "a sessão terminou"},
       {"this folder has no .apron/ yet", "esta pasta ainda não tem .apron/"},
       {"this machine", "esta máquina"},
@@ -169,14 +156,18 @@ const std::unordered_map<std::string_view, std::string_view>& pt_br() {
       {"the agent's terminal", "o terminal do agente"},
       {"the run's log", "o log da execução"},
       {"add a machine", "adicionar máquina"},
-      {"end a session", "encerrar uma sessão"},
       {"leave a terminal", "sair de um terminal"},
+      {"usage: apron run start|finish", "uso: apron run start|finish"},
+      {"the screen needs a terminal", "a tela precisa de um terminal"},
+      {"Remove {} from the machines?", "Remover {} das máquinas?"},
+      {"Remove the machine", "Remover a máquina"},
+      {"remove", "remover"},
+      {"could not end the session", "não foi possível encerrar a sessão"},
+      {"end a session, remove a machine", "encerrar uma sessão, remover uma máquina"},
       {"could not write {}", "não foi possível gravar {}"},
       {"usage: apron machines [add <ssh host> [apron command there] | rm <ssh host>]", "uso: apron machines [add <host ssh> [comando do apron lá] | rm <host ssh>]"},
       {"aprond is running on {}", "o aprond está rodando em {}"},
       {"warning: {} of {} files left the scope:", "aviso: {} de {} arquivos saíram do escopo:"},
-      {"no run in progress; use apron scope <run>", "nenhuma execução em curso; use apron scope <execução>"},
-      {"{} files, {} outside the scope", "{} arquivos, {} fora do escopo"},
       {"scope: {} files, {} outside", "escopo: {} arquivos, {} fora"},
       {"checks.toml has no [[check]] with name and run", "o checks.toml não tem nenhum [[check]] com name e run"},
       {"warning: no check named {} in checks.toml", "aviso: nenhum check chamado {} no checks.toml"},
@@ -184,63 +175,31 @@ const std::unordered_map<std::string_view, std::string_view>& pt_br() {
       {"no run in progress: results were not recorded", "nenhuma execução em curso: os resultados não foram gravados"},
       {"checks.toml line {}: expected key = value", "checks.toml linha {}: esperava chave = valor"},
 
-      {R"(apron — operate AI agents and follow projects
+      {R"(apron: one screen for your coding agents and projects
 
-  apron                         open the progress view in the terminal
+  apron                  open the screen
+  apron new [command]    start a session here and attach to it; -d leaves it in the background
 
-Sessions (kept by aprond, started on demand):
-  apron new [-d] [command...]   new session in this directory, attached unless -d
-  apron ls                      sessions and the program in the foreground of each
-  apron attach <session>        attach this terminal; Ctrl-] detaches
-  apron kill <session>          end a session
-  apron daemon [stop]           is aprond running? stop it
-  apron projects                every project on this machine, with its runs
-
-Runs (docs/agent-protocol.md):
-  apron run start <task> [--agent name] [--intent "sentence"] [--force]
+For agents (docs/agent-protocol.md):
+  apron run start <task> [--agent name] [--intent "sentence"]
   apron run finish [--result done|failed|abandoned] "summary"
-  apron run current
-  apron report step|ask|note "sentence"
-  apron report blocked "sentence"
-  apron log [run]               timeline of a run (default: the current or the latest)
-  apron check [names...]        run checks.toml and record the results in the current run
-  apron scope [run]             files the run touched, and which left the task's scope
-  apron review                  finished runs waiting for a person
-  apron review <run> merge|return "comment"|discard
-  apron runs                    every run in the project
-  apron tasks [--ready]         the plan in tasks.md, with each task's state
+  apron report step|ask|blocked|note "sentence"
+  apron check [names...]
 
-Environment: APRON_AGENT (agent name), APRON_MACHINE (machine name),
-APRON_LANG (en or pt-BR; default: system locale, then English), NO_COLOR.
+The language follows the system; APRON_LANG=en or pt-BR chooses.
 )",
-       R"(apron — operar agentes e acompanhar projetos
+       R"(apron: uma tela para seus agentes de código e projetos
 
-  apron                         abre o Andamento no terminal
+  apron                  abre a tela
+  apron new [comando]    inicia uma sessão aqui e entra nela; -d deixa em segundo plano
 
-Sessões (mantidas pelo aprond, que sobe sozinho):
-  apron new [-d] [comando...]   nova sessão neste diretório, anexada a menos que -d
-  apron ls                      as sessões e o programa em primeiro plano de cada uma
-  apron attach <sessão>         anexa este terminal; Ctrl-] desanexa
-  apron kill <sessão>           encerra uma sessão
-  apron daemon [stop]           o aprond está rodando? pare-o
-  apron projects                todos os projetos desta máquina, com as execuções
-
-Execuções (docs/agent-protocol.md):
-  apron run start <tarefa> [--agent nome] [--intent "frase"] [--force]
+Para agentes (docs/agent-protocol.md):
+  apron run start <tarefa> [--agent nome] [--intent "frase"]
   apron run finish [--result done|failed|abandoned] "resumo"
-  apron run current
-  apron report step|ask|note "frase"
-  apron report blocked "frase"
-  apron log [execução]          linha do tempo de uma execução (padrão: a atual ou a última)
-  apron check [nomes...]        roda o checks.toml e grava os resultados na execução atual
-  apron scope [execução]        arquivos que a execução tocou, e os que saíram do escopo
-  apron review                  execuções terminadas esperando uma pessoa
-  apron review <execução> merge|return "comentário"|discard
-  apron runs                    todas as execuções do projeto
-  apron tasks [--ready]         o plano do tasks.md, com o estado de cada tarefa
+  apron report step|ask|blocked|note "frase"
+  apron check [nomes...]
 
-Variáveis: APRON_AGENT (nome do agente), APRON_MACHINE (nome da máquina),
-APRON_LANG (en ou pt-BR; padrão: idioma do sistema, senão inglês), NO_COLOR.
+O idioma segue o do sistema; APRON_LANG=en ou pt-BR escolhe.
 )"},
   };
   return m;

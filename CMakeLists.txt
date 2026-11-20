@@ -74,11 +74,8 @@ add_executable(apron
   src/cli/cmd_tasks.cpp
   src/cli/cmd_ui.cpp
   src/cli/cmd_check.cpp
-  src/cli/cmd_scope.cpp
   src/cli/cmd_sessions.cpp
-  src/cli/cmd_projects.cpp
   src/cli/cmd_hook.cpp
-  src/cli/cmd_review.cpp
   src/cli/cmd_machines.cpp
   src/cli/daemon_client.cpp
   src/cli/fleet.cpp

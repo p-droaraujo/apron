@@ -35,16 +35,6 @@ void term_size(int& cols, int& rows) {
 
 std::optional<DaemonClient> connect(bool autostart) { return connect_to("", autostart); }
 
-// "nexus:3" is session 3 on nexus; "3" is session 3 here. 0 means not a session.
-std::pair<std::string, uint32_t> target(const std::string& arg) {
-  auto colon = arg.rfind(':');
-  std::string host = colon == std::string::npos ? "" : arg.substr(0, colon);
-  std::string_view num = colon == std::string::npos ? std::string_view(arg) : std::string_view(arg).substr(colon + 1);
-  uint32_t id = 0;
-  auto [end, ec] = std::from_chars(num.data(), num.data() + num.size(), id);
-  if (ec != std::errc() || end != num.data() + num.size()) id = 0;
-  return {host, id};
-}
 
 constexpr char kDetachKey = 0x1d;  // Ctrl-]
 
@@ -148,56 +138,8 @@ int cmd_new(const Args& args) {
   return attach(*c, id);
 }
 
-int cmd_ls(const Args& args) {
-  auto c = connect_to(args.pos.empty() ? "" : args.pos[0], false);
-  if (!c) return 1;
-  json::Object req;
-  req.emplace_back("cmd", "sessions.list");
-  std::string err;
-  auto reply = c->request(std::move(req), &err);
-  if (!reply) return fail(err);
-  Style st;
-  const json::Value* list = reply->find("sessions");
-  if (!list || list->arr().empty()) {
-    std::puts(tr("no sessions").c_str());
-    return 0;
-  }
-  int64_t now = timeutil::now_ms();
-  for (const auto& s : list->arr()) {
-    bool alive = s.find("alive") && s.find("alive")->boolean();
-    std::string fg = s.get_str("foreground");
-    std::string id = std::to_string(static_cast<long long>(s.find("id")->num()));
-    std::string age = timeutil::short_duration(now - timeutil::parse_iso8601(s.get_str("created")).value_or(now));
-    std::string cwd = s.get_str("cwd");
-    if (const char* home = std::getenv("HOME"); home && cwd.rfind(home, 0) == 0) cwd = "~" + cwd.substr(std::strlen(home));
-    std::printf("%s %-4s %-12s %-6s %s\n", alive ? st.blue("●").c_str() : st.dim("○").c_str(), id.c_str(),
-                (alive ? fg : tr("exited")).c_str(), st.dim(age).c_str(), st.dim(cwd).c_str());
-  }
-  return 0;
-}
 
-int cmd_attach(const Args& args) {
-  if (args.pos.empty()) return fail(tr("usage: apron attach [<machine>:]<session>"));
-  auto [host, id] = target(args.pos[0]);
-  if (id == 0) return fail(trf("no session {}", {args.pos[0]}));
-  auto c = connect_to(host, false);
-  if (!c) return 1;
-  return attach(*c, id);
-}
 
-int cmd_kill(const Args& args) {
-  if (args.pos.empty()) return fail(tr("usage: apron kill [<machine>:]<session>"));
-  auto [host, id] = target(args.pos[0]);
-  if (id == 0) return fail(trf("no session {}", {args.pos[0]}));
-  auto c = connect_to(host, false);
-  if (!c) return 1;
-  json::Object req;
-  req.emplace_back("cmd", "sessions.kill");
-  req.emplace_back("session", static_cast<long long>(id));
-  std::string err;
-  if (!c->request(std::move(req), &err)) return fail(err == "not_found" ? trf("no session {}", {args.pos[0]}) : err);
-  return 0;
-}
 
 int cmd_daemon(const Args& args) {
   std::string sub = args.pos.empty() ? "status" : args.pos[0];
@@ -277,9 +219,6 @@ bool kill_session(const std::string& host, uint32_t id, std::string* error) {
 
 int cmd_sessions(const std::string& cmd, const Args& args) {
   if (cmd == "new") return cmd_new(args);
-  if (cmd == "ls") return cmd_ls(args);
-  if (cmd == "attach") return cmd_attach(args);
-  if (cmd == "kill") return cmd_kill(args);
   return cmd_daemon(args);
 }
 

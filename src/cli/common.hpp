@@ -53,15 +53,10 @@ std::string default_agent();
 int cmd_run(const Args& args);
 int cmd_report(const Args& args);
 int cmd_log(const Args& args);
-int cmd_runs(const Args& args);
-int cmd_tasks(const Args& args);
 int cmd_ui(const Args& args);
 int cmd_check(const Args& args);
-int cmd_scope(const Args& args);
 int cmd_sessions(const std::string& cmd, const Args& args);
-int cmd_projects(const Args& args);
 int cmd_hook(const Args& args);
-int cmd_review(const Args& args);
 int cmd_machines(const Args& args);
 int cmd_proxy(const Args& args);
 

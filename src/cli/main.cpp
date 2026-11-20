@@ -66,34 +66,18 @@ std::string default_agent() {
 
 namespace {
 
-constexpr const char* kUsage = R"(apron — operate AI agents and follow projects
+constexpr const char* kUsage = R"(apron: one screen for your coding agents and projects
 
-  apron                         open the progress view in the terminal
+  apron                  open the screen
+  apron new [command]    start a session here and attach to it; -d leaves it in the background
 
-Sessions (kept by aprond, started on demand):
-  apron new [-d] [command...]   new session in this directory, attached unless -d
-  apron ls                      sessions and the program in the foreground of each
-  apron attach <session>        attach this terminal; Ctrl-] detaches
-  apron kill <session>          end a session
-  apron daemon [stop]           is aprond running? stop it
-  apron projects                every project on this machine, with its runs
-
-Runs (docs/agent-protocol.md):
-  apron run start <task> [--agent name] [--intent "sentence"] [--force]
+For agents (docs/agent-protocol.md):
+  apron run start <task> [--agent name] [--intent "sentence"]
   apron run finish [--result done|failed|abandoned] "summary"
-  apron run current
-  apron report step|ask|note "sentence"
-  apron report blocked "sentence"
-  apron log [run]               timeline of a run (default: the current or the latest)
-  apron check [names...]        run checks.toml and record the results in the current run
-  apron scope [run]             files the run touched, and which left the task's scope
-  apron review                  finished runs waiting for a person
-  apron review <run> merge|return "comment"|discard
-  apron runs                    every run in the project
-  apron tasks [--ready]         the plan in tasks.md, with each task's state
+  apron report step|ask|blocked|note "sentence"
+  apron check [names...]
 
-Environment: APRON_AGENT (agent name), APRON_MACHINE (machine name),
-APRON_LANG (en or pt-BR; default: system locale, then English), NO_COLOR.
+The language follows the system; APRON_LANG=en or pt-BR chooses.
 )";
 
 }  // namespace
@@ -108,18 +92,14 @@ int main(int argc, char** argv) {
   std::string cmd = argv[1];
   if (cmd == "run") return cmd_run(Args::parse(argc, argv, 2, {"force"}));
   if (cmd == "report") return cmd_report(Args::parse(argc, argv, 2));
-  if (cmd == "log") return cmd_log(Args::parse(argc, argv, 2));
-  if (cmd == "new" || cmd == "ls" || cmd == "attach" || cmd == "kill" || cmd == "daemon")
-    return cmd_sessions(cmd, Args::parse(argc, argv, 2, {"d", "detach"}));
-  if (cmd == "machines") return cmd_machines(Args::parse(argc, argv, 2));
-  if (cmd == "proxy") return cmd_proxy(Args::parse(argc, argv, 2));
-  if (cmd == "review") return cmd_review(Args::parse(argc, argv, 2));
-  if (cmd == "hook") return cmd_hook(Args::parse(argc, argv, 2));
-  if (cmd == "projects") return cmd_projects(Args::parse(argc, argv, 2));
-  if (cmd == "scope") return cmd_scope(Args::parse(argc, argv, 2));
   if (cmd == "check") return cmd_check(Args::parse(argc, argv, 2));
-  if (cmd == "runs") return cmd_runs(Args::parse(argc, argv, 2));
-  if (cmd == "tasks") return cmd_tasks(Args::parse(argc, argv, 2, {"ready", "prontas"}));
+  if (cmd == "new" || cmd == "daemon") return cmd_sessions(cmd, Args::parse(argc, argv, 2, {"d", "detach"}));
+  // Plumbing, out of the help: Claude Code's hooks, ssh, the daemon, the
+  // timeline that goes into a commit, and the machine list for scripts.
+  if (cmd == "hook") return cmd_hook(Args::parse(argc, argv, 2));
+  if (cmd == "proxy") return cmd_proxy(Args::parse(argc, argv, 2));
+  if (cmd == "log") return cmd_log(Args::parse(argc, argv, 2));
+  if (cmd == "machines") return cmd_machines(Args::parse(argc, argv, 2));
   if (cmd == "--version" || cmd == "version") {
     std::puts("apron 0.0.1");
     return 0;

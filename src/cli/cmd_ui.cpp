@@ -42,7 +42,7 @@ bool has_project(const std::string& root) {
 }  // namespace
 
 int cmd_ui(const Args&) {
-  if (!isatty(STDOUT_FILENO)) return fail(tr("the screen needs a terminal; outside one, use apron log or apron tasks"));
+  if (!isatty(STDOUT_FILENO)) return fail(tr("the screen needs a terminal"));
   std::optional<Project> project = find_project(std::filesystem::current_path());
 
   tui::Terminal term;
@@ -229,6 +229,15 @@ int cmd_ui(const Args&) {
     auto rows = tui::side_rows(fleet);
     if (!side || side_sel >= static_cast<int>(rows.size())) return;
     const auto& row = rows[static_cast<size_t>(side_sel)];
+    if (row.kind == tui::SideRow::Kind::Machine) {
+      const auto& m = fleet.machines[static_cast<size_t>(row.group)];
+      if (m.here) return;
+      kill_host = m.name;
+      kill_id = 0;  // 0: remove the machine from the list
+      input = trf("Remove {} from the machines?", {m.name});
+      overlay = Overlay::Confirm;
+      return;
+    }
     if (row.kind != tui::SideRow::Kind::Session) return;
     const auto& s = fleet.projects[static_cast<size_t>(row.group)].sessions[static_cast<size_t>(row.item)];
     kill_host = s.machine;
@@ -290,7 +299,8 @@ int cmd_ui(const Args&) {
                                                      : tr("Comment for the agent");
       tui::render_prompt(screen, main_r, what, input, true);
     }
-    if (overlay == Overlay::Confirm) tui::render_prompt(screen, main_r, tr("End the session"), input, false);
+    if (overlay == Overlay::Confirm)
+      tui::render_prompt(screen, main_r, kill_id ? tr("End the session") : tr("Remove the machine"), input, false);
 
     std::vector<std::pair<std::string, std::string>> keys;
     switch (overlay) {
@@ -310,7 +320,7 @@ int cmd_ui(const Args&) {
       case Overlay::Task: keys = {{"↑↓", tr("scroll")}, {"esc", tr("back")}}; break;
       case Overlay::None:
         if (side) {
-          keys = {{"enter", tr("open")}, {"x", tr("end session")}, {"→", tr("board")}};
+          keys = {{"enter", tr("open")}, {"x", tr("remove")}, {"→", tr("board")}};
         } else if (tab == 1) {
           keys = {{"↑↓", tr("scroll")}};
         } else {
@@ -366,7 +376,9 @@ int cmd_ui(const Args&) {
     if (overlay == Overlay::Confirm) {
       if (k.key == Key::Enter) {
         std::string err;
-        if (!kill_session(kill_host, kill_id, &err)) say(err);
+        if (kill_id == 0) err = remove_machine(kill_host);
+        else if (!kill_session(kill_host, kill_id, &err) && err.empty()) err = tr("could not end the session");
+        if (!err.empty()) say(err);
         poller.poke();
       }
       if (k.key == Key::Enter || k.key == Key::Esc) overlay = Overlay::None;

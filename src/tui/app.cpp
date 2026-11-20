@@ -230,11 +230,19 @@ Rect render_main_frame(Screen& sc, Rect r, const std::string& title, const std::
 void render_board(Screen& sc, Rect r, const Model& m, const View& v, bool focused, const std::vector<Button>& buttons,
                   int64_t now, std::vector<Hit>& hits) {
   const std::string names[4] = {tr("Plan"), tr("Running"), tr("Gates"), tr("Done")};
+  // Running and Gates hold boxes with more to say; Plan and Done are lists.
   int gap = 2;
-  int lw = std::max(12, (r.w - 3 * gap) / 4);
+  const int weight[4] = {2, 3, 3, 2};
+  int room = std::max(40, r.w - 3 * gap);
+  int widths[4], xs[4], x = r.x;
+  for (int i = 0; i < 4; ++i) {
+    widths[i] = room * weight[i] / 10;
+    xs[i] = x;
+    x += widths[i] + gap;
+  }
   int top = r.y + 1;
   for (int lane = 0; lane < 4; ++lane) {
-    int lx = r.x + lane * (lw + gap);
+    int lx = xs[lane], lw = widths[lane];
     const auto& items = m.lanes[lane];
     int hx = sc.put(lx, top, names[lane], kDim);
     sc.put(lx + hx + 1, top, std::to_string(items.size()), kSoft);
@@ -327,7 +335,7 @@ void render_help(Screen& sc, Rect r) {
       {"tab", "next view"},          {"shift-tab", "previous view"}, {"←→↑↓ hjkl", "move"},
       {"enter", "open"},             {"esc", "back"},                {"t", "the agent's terminal"},
       {"o", "the run's log"},        {"n", "new session"},           {"+", "add a machine"},
-      {"x", "end a session"},        {"ctrl-]", "leave a terminal"}, {"q", "quit"},
+      {"x", "end a session, remove a machine"},        {"ctrl-]", "leave a terminal"}, {"q", "quit"},
   };
   int w = 46, h = static_cast<int>(std::size(keys)) + 4;
   Rect box{r.x + (r.w - w) / 2, r.y + std::max(0, (r.h - h) / 2), w, h};

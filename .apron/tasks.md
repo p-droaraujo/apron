@@ -96,7 +96,7 @@ See every agent on one screen and reach the right terminal in one keystroke.
   done-when: aprond answers project.board for the projects it knows; choosing a project of another machine in the sidebar shows its lanes and Enter on a card with a live session opens that terminal over ssh
   checks: build, test
 
-- [ ] T22 Cut the commands: a person needs `apron` and `apron new`; agents use `run`, `report` and `check`; `hook`, `proxy` and `daemon` leave the help; the rest goes once the screen covers it
+- [x] T22 Cut the commands: a person needs `apron` and `apron new`; agents use `run`, `report` and `check`; `hook`, `proxy` and `daemon` leave the help; the rest goes once the screen covers it
   scope: src/cli/**, src/core/i18n.cpp, tests/**, README.md, docs/**, AGENTS.md, integrations/**
   depends: T20
   done-when: `apron --help` lists two commands for people and three for agents; nothing the removed commands did is lost from the screen; tests and docs follow

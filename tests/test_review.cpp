@@ -6,6 +6,8 @@
 #include <fstream>
 #include <sstream>
 
+#include "core/i18n.hpp"
+#include "core/project.hpp"
 #include "core/review.hpp"
 #include "core/runs.hpp"
 #include "core/scope.hpp"
@@ -61,34 +63,47 @@ struct Repo {
 
 }  // namespace
 
+// The screen calls these on a Gates card; the tests call them the same way.
+bool queued(const apron::Project& p, const std::string& run) {
+  for (const auto& r : apron::review_queue(p))
+    if (r.id == run) return true;
+  return false;
+}
+
 TEST("review: a finished run waits in the queue until it is merged into main") {
+  apron::i18n::set(apron::i18n::Lang::En);
   Repo r;
+  apron::Project p{r.dir};
   std::string run = r.agent_run();
-  CHECK(r.sh(r.apron + " review").find("R1") != std::string::npos);
+  CHECK(queued(p, run));
   CHECK(!fs::exists(r.dir / "feature.txt"));  // not in main yet
-  CHECK_EQ(r.sh(r.apron + " review " + run + " merge"), std::string(""));
+  CHECK_EQ(apron::review_merge(p, run), std::string(""));
   CHECK(fs::exists(r.dir / "feature.txt"));   // main fast-forwarded
-  CHECK(r.sh(r.apron + " review").find("nothing to review") != std::string::npos);
+  CHECK(!queued(p, run));
   CHECK(r.sh(r.apron + " log " + run).find("merged") != std::string::npos);
 }
 
 TEST("review: return reopens the task with the comment the next agent reads") {
+  apron::i18n::set(apron::i18n::Lang::En);
   Repo r;
+  apron::Project p{r.dir};
   std::string run = r.agent_run();
-  CHECK(r.sh(r.apron + " review " + run + " return").find("needs a comment") != std::string::npos);
-  r.sh(r.apron + " review " + run + " return 'keep the old file name'");
+  CHECK(apron::review_return(p, run, "").find("needs a comment") != std::string::npos);
+  CHECK_EQ(apron::review_return(p, run, "keep the old file name"), std::string(""));
   std::string tasks = r.tasks();
   CHECK(tasks.find("- [ ] R1") != std::string::npos);
   CHECK(tasks.find("review: keep the old file name") != std::string::npos);
-  CHECK(r.sh(r.apron + " review").find("nothing to review") != std::string::npos);
+  CHECK(!queued(p, run));
 }
 
 TEST("review: main that moved on is never merged over") {
+  apron::i18n::set(apron::i18n::Lang::En);
   Repo r;
+  apron::Project p{r.dir};
   std::string run = r.agent_run();
   std::ofstream(r.dir / "other.txt") << "x\n";
   r.sh("git add other.txt && git commit -q -m other");
-  CHECK(r.sh(r.apron + " review " + run + " merge").find("rebase") != std::string::npos);
+  CHECK(apron::review_merge(p, run).find("rebase") != std::string::npos);
   CHECK(!fs::exists(r.dir / "feature.txt"));
 }
 

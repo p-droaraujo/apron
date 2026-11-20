@@ -59,6 +59,7 @@ std::vector<Machine> load_machines();
 const Machine* find_machine(const std::vector<Machine>& all, const std::string& host);
 // Adds a host to the list (or updates its command); returns an error, or "".
 std::string add_machine(const std::string& host, const std::string& remote = "apron");
+std::string remove_machine(const std::string& host);
 
 // The local aprond when `host` is empty, else that machine's through ssh.
 // Prints the reason and returns nothing when it cannot connect.

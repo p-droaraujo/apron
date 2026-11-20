@@ -160,13 +160,8 @@ int cmd_run(const Args& args) {
   std::string sub = args.pos.empty() ? "" : args.pos[0];
   if (sub == "start") return run_start(args, *project);
   if (sub == "finish") return run_finish(args, *project);
-  if (sub == "current") {
-    auto current = project->current_run();
-    if (!current) return 1;
-    std::printf("%s\n", current->c_str());
-    return 0;
-  }
-  return fail(tr("usage: apron run start|finish|current"));
+
+  return fail(tr("usage: apron run start|finish"));
 }
 
 }  // namespace apron::cli

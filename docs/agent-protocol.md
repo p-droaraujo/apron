@@ -28,7 +28,7 @@ Markdown that both people and machines read. A task is a list item with a stable
 - [ ] T6 Minimal daemon keeps sessions and answers sessions.list
   scope: src/daemon/**, tests/daemon/**
   depends: T1
-  done-when: `aprond` starts, `apron new` creates a PTY and `apron ls` lists it
+  done-when: `aprond` starts and `apron new` creates a PTY that `sessions.list` reports
   checks: build, test
 ```
 
@@ -71,7 +71,7 @@ apron run finish --result done "..."    →  [x], summary, goes to Review
 git commit (with Apron-Run: <id>)       →  tasks.md and code change together
 ```
 
-Then a person reviews the run (Enter on its card in Gates, or `apron review`): **merge** fast-forwards `main` to the run's commit and never merges over a `main` that moved on; **return** reopens the task with the person's comment in its `review` field; **discard** reopens the task and deletes nothing.
+Then a person reviews the run (Enter on its card in Gates): **merge** fast-forwards `main` to the run's commit and never merges over a `main` that moved on; **return** reopens the task with the person's comment in its `review` field; **discard** reopens the task and deletes nothing.
 
 The commit comes after `finish`, because `finish` changes the state in `tasks.md`. The `Apron-Run` trailer links the commit to the run, and the commit body carries the summary: events stay out of git, but the story of the work survives the push.
 

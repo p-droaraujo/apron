@@ -10,6 +10,7 @@
 #include "tui/app.hpp"
 #include "tui/progress.hpp"
 #include "tui/screen.hpp"
+#include "tui/vt.hpp"
 
 using namespace apron;
 using namespace apron::tui;
@@ -134,4 +135,31 @@ TEST("activity: events of several projects, newest first") {
   CHECK_EQ(load_activity({a.string(), b.string()}, 2).size(), size_t(2));
   fs::remove_all(a);
   fs::remove_all(b);
+}
+
+TEST("vt: text, colors, cursor, erase, alternate screen and replies") {
+  Vt vt(20, 5);
+  vt.feed("hello\r\nworld");
+  CHECK_EQ(vt.cell(0, 0).ch, std::string("h"));
+  CHECK_EQ(vt.cell(4, 1).ch, std::string("d"));
+  CHECK_EQ(vt.cursor_x(), 5);
+  vt.feed("\x1b[31mR\x1b[0m");
+  CHECK(vt.cell(5, 1).style.fg.set);
+  vt.feed("\x1b[2J\x1b[3;4Hx");
+  CHECK_EQ(vt.cell(0, 0).ch, std::string(" "));
+  CHECK_EQ(vt.cell(3, 2).ch, std::string("x"));
+  vt.feed("\x1b[?1049h\x1b[Halt");
+  CHECK_EQ(vt.cell(0, 0).ch, std::string("a"));
+  vt.feed("\x1b[?1049l");
+  CHECK_EQ(vt.cell(3, 2).ch, std::string("x"));  // the main screen is back as it was
+  vt.feed("\x1b[6n");
+  CHECK_EQ(vt.take_replies(), std::string("\x1b[3;5R"));
+  vt.feed("é");  // UTF-8 split across feeds
+  vt.feed("\xc3");
+  vt.feed("\xa9");
+  CHECK_EQ(vt.cell(5, 2).ch, std::string("é"));
+  for (int i = 0; i < 10; ++i) vt.feed("\r\nline");
+  CHECK_EQ(vt.cell(0, 4).ch, std::string("l"));  // scrolled, the last line at the bottom
+  vt.feed("\x1b[?1h");
+  CHECK(vt.app_cursor());
 }

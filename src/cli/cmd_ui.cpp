@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <filesystem>
+#include <memory>
 
 #include "cli/common.hpp"
 #include "cli/daemon_client.hpp"
@@ -17,6 +18,7 @@
 #include "tui/app.hpp"
 #include "tui/progress.hpp"
 #include "tui/term.hpp"
+#include "tui/vt.hpp"
 
 namespace apron::cli {
 
@@ -32,6 +34,26 @@ void pop_utf8(std::string& s) {
     s.pop_back();
     if ((c & 0xC0) != 0x80) break;  // stop after the first byte of a code point
   }
+}
+
+// An agent's terminal shown in the main pane: a connection to its session
+// and a small terminal emulator fed by it.
+struct Focus {
+  std::string host;
+  uint32_t id = 0;
+  DaemonClient client;
+  tui::Vt vt;
+};
+
+// What the arrows send depends on the mode the program asked for.
+std::string translate_keys(const std::string& raw, bool app_cursor) {
+  if (!app_cursor || raw.size() != 3 || raw[0] != '\x1b' || raw[1] != '[') return raw;
+  if (raw[2] >= 'A' && raw[2] <= 'D') return std::string("\x1bO") + raw[2];
+  return raw;
+}
+
+bool is_detach(const std::string& raw) {
+  return raw == "\x1d" || raw == "\x1b[93;5u" || raw == "\x1b[27;5;93~";
 }
 
 bool has_project(const std::string& root) {
@@ -57,7 +79,8 @@ int cmd_ui(const Args&) {
   if (project) model = tui::load_model(*project);
   tui::clamp_selection(model, view);
 
-  enum class Overlay { None, Log, Task, Review, Help, Prompt, Confirm } overlay = Overlay::None;
+  enum class Overlay { None, Log, Task, Review, Help, Prompt, Confirm, Focus } overlay = Overlay::None;
+  std::unique_ptr<Focus> focus;
   enum class Ask { NewSession, AddMachine, Return } asking = Ask::NewSession;
   int tab = 0;  // 0 the board, 1 the activity
   bool side = false;
@@ -133,17 +156,69 @@ int cmd_ui(const Args&) {
     else b.push_back({Action::Details, "d", tr("Details")});
     return b;
   };
-  // Hands the screen to a session and takes it back after Ctrl-].
+  // The agent's terminal in the main pane, with the sidebar still in view.
+  auto close_focus = [&] {
+    if (focus) {
+      json::Object req;
+      req.emplace_back("cmd", "sessions.detach");
+      req.emplace_back("session", static_cast<long long>(focus->id));
+      focus->client.send({proto::Type::Ctrl, 0, json::dump(json::Value(std::move(req)))});
+    }
+    focus.reset();
+    if (overlay == Overlay::Focus) overlay = Overlay::None;
+  };
+  auto drain_focus = [&] {
+    if (!focus) return;
+    while (auto f = focus->client.next(0)) {
+      if (f->type == proto::Type::Data && f->channel == focus->id) {
+        focus->vt.feed(f->payload);
+      } else if (f->type == proto::Type::Ctrl) {
+        auto v = json::parse(f->payload);
+        if (v && v->get_str("event") == "session.exited") {
+          say(tr("the session has ended"));
+          close_focus();
+          poller.poke();
+          return;
+        }
+      }
+    }
+    if (std::string r = focus->vt.take_replies(); !r.empty()) focus->client.send({proto::Type::Data, focus->id, r});
+  };
   auto open_terminal = [&](const std::string& host, uint32_t id) {
-    term.suspend();
-    // The window title says how to come back while the agent owns the screen.
-    term.write("\x1b[22;0t\x1b]2;" + tr("apron · Ctrl-] returns") + "\x07");
-    int rc = attach_session(host, id);
-    term.write("\x1b[23;0t");
-    term.resume();
-    screen.resize(term.width(), term.height());
-    poller.poke();
-    if (rc != 0) say(tr("the session has ended"));
+    close_focus();
+    auto f = std::make_unique<Focus>();
+    f->host = host;
+    f->id = id;
+    std::string err;
+    bool ok;
+    if (host.empty()) {
+      ok = f->client.connect(true, &err);
+    } else {
+      auto all = load_machines();
+      const Machine* m = find_machine(all, host);
+      ok = f->client.connect_ssh(host, m ? m->remote : "apron", &err);
+    }
+    if (!ok) {
+      say(err);
+      return;
+    }
+    // The session takes the pane's size, so the agent draws for what shows.
+    int SW = tui::sidebar_width(screen.width());
+    int cols = std::max(20, screen.width() - SW - 4), rows = std::max(5, screen.height() - 3);
+    f->vt.resize(cols, rows);
+    json::Object req;
+    req.emplace_back("cmd", "sessions.attach");
+    req.emplace_back("session", static_cast<long long>(id));
+    req.emplace_back("cols", cols);
+    req.emplace_back("rows", rows);
+    if (!f->client.request(std::move(req), &err)) {
+      say(err == "not_found" ? tr("the session has ended") : err);
+      return;
+    }
+    focus = std::move(f);
+    overlay = Overlay::Focus;
+    side = false;
+    drain_focus();
   };
   auto run_action = [&](Action a, const tui::Item& it) {
     switch (a) {
@@ -278,6 +353,13 @@ int cmd_ui(const Args&) {
                                              : tr("no project here");
     if (overlay == Overlay::Log || overlay == Overlay::Review) title += " · " + open_run;
     if (overlay == Overlay::Task) title += " · " + open_task;
+    if (overlay == Overlay::Focus && focus) {
+      title = trf("session {}", {std::to_string(focus->id)});
+      for (const auto& g : fleet.projects)
+        for (const auto& s : g.sessions)
+          if (s.id == focus->id && s.machine == focus->host)
+            title = s.what + (focus->host.empty() ? "" : "@" + focus->host) + " · " + g.name;
+    }
     tui::Rect in = tui::render_main_frame(screen, main_r, title, {tr("Progress"), tr("Activity")}, tab, !side, hits);
     const tui::Item* sel = selected_item();
     std::vector<Button> buttons = buttons_for(sel);
@@ -290,7 +372,21 @@ int cmd_ui(const Args&) {
       tui::render_review(sub, *project, summarize(open_run, load_events(project->run_file(open_run))), stat);
     else if (tab == 1) tui::render_activity(sub, activity, activity_scroll, now);
     else drew_sub = false;
-    if (drew_sub) screen.blit(sub, in.x, in.y);
+    if (overlay == Overlay::Focus && focus) {
+      drew_sub = true;
+      if (focus->vt.cols() != in.w || focus->vt.rows() != in.h) {
+        focus->vt.resize(in.w, in.h);
+        json::Object r;
+        r.emplace_back("cmd", "sessions.resize");
+        r.emplace_back("session", static_cast<long long>(focus->id));
+        r.emplace_back("cols", in.w);
+        r.emplace_back("rows", in.h);
+        focus->client.send({proto::Type::Ctrl, 0, json::dump(json::Value(std::move(r)))});
+      }
+      focus->vt.draw(screen, in.x, in.y, in.w, in.h, true);
+    } else if (drew_sub) {
+      screen.blit(sub, in.x, in.y);
+    }
     else if (project || !remote_host.empty()) tui::render_board(screen, in, model, view, !side, buttons, now, hits);
     else screen.put(in.x, in.y + 1, tr("No project in this folder. Pick one in the sidebar."), {});
 
@@ -309,6 +405,7 @@ int cmd_ui(const Args&) {
       case Overlay::Prompt:
       case Overlay::Confirm: keys = {{"enter", tr("confirm")}, {"esc", tr("cancel")}}; break;
       case Overlay::Help: keys = {{"esc", tr("close")}}; break;
+      case Overlay::Focus: keys = {{"ctrl-]", tr("back to the board")}, {tr("click"), tr("another session")}}; break;
       case Overlay::Review: {
         keys = {{"m", tr("merge")}, {"r", tr("return with a comment")}, {"d", tr("discard")}};
         if (sel)
@@ -343,11 +440,23 @@ int cmd_ui(const Args&) {
     term.write(screen.flush());
 
     // --- Input --------------------------------------------------------------
-    tui::KeyEvent k = term.poll(100);
+    tui::KeyEvent k = term.poll(focus ? 50 : 100, focus ? focus->client.fd() : -1);
     ++view.tick;
-    if (k.key == Key::None) continue;
+    if (focus) drain_focus();
+    if (k.key == Key::None || k.key == Key::Wake) continue;
     if (k.key == Key::Resize) {
       screen.resize(term.width(), term.height());
+      continue;
+    }
+
+    // In an agent's terminal every key goes to the agent, except Ctrl-].
+    if (overlay == Overlay::Focus && focus && k.key != Key::Click && k.key != Key::Resize) {
+      if (is_detach(k.raw)) {
+        close_focus();
+        poller.poke();
+      } else if (!k.raw.empty() && k.key != Key::WheelUp && k.key != Key::WheelDown) {
+        focus->client.send({proto::Type::Data, focus->id, translate_keys(k.raw, focus->vt.app_cursor())});
+      }
       continue;
     }
 
@@ -360,6 +469,7 @@ int cmd_ui(const Args&) {
         if (asking == Ask::NewSession) {
           std::string err;
           uint32_t id = spawn_session(new_host, new_cwd, input.empty() ? "" : input + "\r", &err);
+          poller.poke();
           if (id) open_terminal(new_host, id);
           else say(err.empty() ? tr("could not start the session") : err);
         } else if (asking == Ask::AddMachine) {
@@ -436,7 +546,10 @@ int cmd_ui(const Args&) {
       else side = false;
       continue;
     }
-    if (c == 'q') return 0;
+    if (c == 'q') {
+      close_focus();
+      return 0;
+    }
     if (c == '?') {
       overlay = overlay == Overlay::Help ? Overlay::None : Overlay::Help;
       continue;

@@ -102,6 +102,18 @@ See every agent on one screen and reach the right terminal in one keystroke.
   done-when: after attaching to Claude Code and pressing Ctrl-], the screen comes back with keys and mouse working; every button on a card shows the key that presses it
   checks: build, test
 
+- [x] T31 Focus: the agent's terminal in the main pane, with the sidebar in view; keys go to the agent, Ctrl-] returns to the board, a click on another session switches to it; a small terminal emulator of our own draws it
+  scope: src/tui/**, src/cli/**, src/core/i18n.cpp, tests/**, CMakeLists.txt
+  depends: T30
+  done-when: Enter on a session or a card's Terminal shows the agent inside Apron, typing reaches it, its output redraws live, Ctrl-] goes back, and the session follows the pane's size
+  checks: build, test
+
+- [ ] T32 Grid: every running agent at once, each in a tile with its live output; Enter on a tile opens it in Focus
+  scope: src/tui/**, src/cli/**, src/core/i18n.cpp, tests/**
+  depends: T31
+  done-when: a third view shows one tile per live session of every machine, updating as they write, and Enter or a click opens the tile in Focus
+  checks: build, test
+
 - [x] T22 Cut the commands: a person needs `apron` and `apron new`; agents use `run`, `report` and `check`; `hook`, `proxy` and `daemon` leave the help; the rest goes once the screen covers it
   scope: src/cli/**, src/core/i18n.cpp, tests/**, README.md, docs/**, AGENTS.md, integrations/**
   depends: T20

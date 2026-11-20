@@ -186,11 +186,6 @@ int cmd_daemon(const Args& args) {
 
 }  // namespace
 
-int attach_session(const std::string& host, uint32_t id) {
-  auto c = connect_to(host, false);
-  if (!c) return 1;
-  return attach(*c, id);
-}
 
 namespace {
 

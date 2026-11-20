@@ -52,6 +52,7 @@ add_library(apron_tui
   src/tui/screen.cpp
   src/tui/progress.cpp
   src/tui/app.cpp
+  src/tui/vt.cpp
 )
 target_link_libraries(apron_tui PUBLIC apron_core)
 target_include_directories(apron_core PUBLIC src)

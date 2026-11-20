@@ -100,21 +100,34 @@ void Terminal::write(const std::string& bytes) {
   }
 }
 
-KeyEvent Terminal::poll(int timeout_ms) {
+KeyEvent Terminal::poll(int timeout_ms, int extra_fd) { return read_key(timeout_ms, extra_fd); }
+
+KeyEvent Terminal::read_key(int timeout_ms, int extra_fd) {
   if (g_resized.exchange(false)) {
     query_size();
     return {Key::Resize, 0, ""};
   }
-  pollfd pfd{STDIN_FILENO, POLLIN, 0};
-  int r = ::poll(&pfd, 1, timeout_ms);
+  pollfd pfd[2] = {{STDIN_FILENO, POLLIN, 0}, {extra_fd, POLLIN, 0}};
+  int r = ::poll(pfd, extra_fd >= 0 ? 2 : 1, timeout_ms);
   if (g_resized.exchange(false)) {
     query_size();
     return {Key::Resize, 0, ""};
   }
   if (r <= 0) return {};
-  char buf[64];
+  if (!(pfd[0].revents & POLLIN)) {
+    KeyEvent w;
+    w.key = Key::Wake;
+    return w;
+  }
+  char buf[256];
   ssize_t n = ::read(STDIN_FILENO, buf, sizeof buf);
   if (n <= 0) return {};
+  KeyEvent e = parse(buf, n);
+  e.raw.assign(buf, static_cast<size_t>(n));
+  return e;
+}
+
+KeyEvent Terminal::parse(const char* buf, long n) {
   if (buf[0] == '\x1b') {
     if (n == 1) return {Key::Esc, 0, ""};
     // SGR mouse: ESC [ < button ; column ; row M (press) or m (release).

@@ -42,5 +42,8 @@ RunSummary summarize(const std::string& id, const std::vector<Event>& events);
 std::vector<RunSummary> list_runs(const Project& project);
 
 std::string new_run_id(const std::string& task, int64_t now_ms);
+// Letters, digits, dot, dash and underscore, not starting with a dot or a dash:
+// a run id names a file in .apron/runs/ and goes into git arguments.
+bool valid_run_id(std::string_view id);
 
 }  // namespace apron

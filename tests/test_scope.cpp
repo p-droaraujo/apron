@@ -37,7 +37,7 @@ TEST("scope: changed files come from git, including untracked ones") {
   fs::path root = fs::temp_directory_path() / ("apron-scope-" + std::to_string(::getpid()));
   fs::remove_all(root);
   fs::create_directories(root / "src");
-  auto sh = [&](const std::string& cmd) { return capture(cmd, root).has_value(); };
+  auto sh = [&](const std::string& cmd) { return std::system(("cd " + root.string() + " && " + cmd + " >/dev/null 2>&1").c_str()) == 0; };
   CHECK(sh("git init -q && git -c user.email=t@t -c user.name=t commit -q --allow-empty -m base"));
   auto base = git_head(root);
   CHECK(base.has_value());

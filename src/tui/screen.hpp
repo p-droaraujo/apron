@@ -44,7 +44,6 @@ class Screen {
 
   // Produces the bytes that take the terminal from the last frame to this one.
   std::string flush();
-  void invalidate() { full_ = true; }
 
  private:
   int w_ = 0, h_ = 0;

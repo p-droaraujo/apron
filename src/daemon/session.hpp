@@ -24,13 +24,18 @@ class Session {
 
   // Reads what the program wrote; keeps the tail for clients that attach later.
   std::string read_output();
+  // Input is queued and written as the program reads it: an agent that stops
+  // reading its terminal cannot block the daemon.
   void write_input(const std::string& bytes);
+  void flush_input();
+  bool has_pending_input() const { return !pending_in_.empty(); }
   void resize(int cols, int rows);
   void kill_tree();
   // Called when the child exits.
   void mark_exited(int status);
 
-  const std::string& replay() const { return replay_; }
+  // The last bytes of output (up to 256 KB), replayed on attach.
+  std::string replay() const;
   // The program in the foreground: the agent, when one is running.
   std::string foreground() const;
   json::Value describe() const;
@@ -45,6 +50,7 @@ class Session {
   std::string cwd_;
   int64_t created_ms_ = 0;
   std::string replay_;  // the last bytes of output, replayed on attach
+  std::string pending_in_;
 };
 
 }  // namespace apron::daemon

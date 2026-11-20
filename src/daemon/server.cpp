@@ -2,6 +2,7 @@
 
 #include "core/activity.hpp"
 
+#include <errno.h>
 #include <fcntl.h>
 #include <poll.h>
 #include <signal.h>
@@ -36,9 +37,16 @@ void on_signal(int sig) {
   (void)n;
 }
 
+// A client that stops reading (a sleeping laptop at the end of an ssh) must
+// never block the daemon: writes are queued and flushed when the socket is
+// ready, and a client that falls this far behind is dropped; it reconnects.
+constexpr size_t kMaxQueued = 8 * 1024 * 1024;
+
 struct Client {
   int fd = -1;
   proto::Reader reader;
+  std::string out;    // bytes waiting for the socket
+  bool dead = false;  // fell too far behind, or the socket failed
   std::set<uint32_t> attached;
   bool subscribed = false;  // receives every event pushed to the daemon
 };
@@ -61,6 +69,7 @@ class Server {
   void handle_ctrl(Client& c, const std::string& payload);
   void reply(Client& c, const json::Value& request, json::Object body, bool ok = true, const std::string& error = "");
   void send(Client& c, proto::Type type, uint32_t channel, const std::string& payload);
+  static void flush(Client& c);
   void pump_session(Session& s);
   void reap_children();
 };
@@ -71,11 +80,12 @@ int Server::run() {
     std::vector<pollfd> fds;
     fds.push_back({listen_fd_, POLLIN, 0});
     fds.push_back({g_signal_pipe[0], POLLIN, 0});
-    for (auto& c : clients_) fds.push_back({c->fd, POLLIN, 0});
+    for (auto& c : clients_)
+      fds.push_back({c->fd, static_cast<short>(POLLIN | (c->out.empty() ? 0 : POLLOUT)), 0});
     std::vector<Session*> polled;
     for (auto& [id, s] : sessions_)
       if (s->alive()) {
-        fds.push_back({s->fd(), POLLIN, 0});
+        fds.push_back({s->fd(), static_cast<short>(POLLIN | (s->has_pending_input() ? POLLOUT : 0)), 0});
         polled.push_back(s.get());
       }
     if (poll(fds.data(), fds.size(), 1000) < 0) continue;
@@ -90,16 +100,23 @@ int Server::run() {
     }
     size_t base = 2;
     std::vector<Client*> dropped;
-    for (size_t i = 0; i < clients_.size(); ++i)
-      if (fds[base + i].revents & (POLLIN | POLLHUP | POLLERR))
-        if (!handle_client(*clients_[i])) dropped.push_back(clients_[i].get());
-    base += clients_.size();
-    for (size_t i = 0; i < polled.size(); ++i)
-      if (fds[base + i].revents & (POLLIN | POLLHUP)) pump_session(*polled[i]);
-    for (Client* d : dropped) {
-      close(d->fd);
-      std::erase_if(clients_, [&](const auto& c) { return c.get() == d; });
+    size_t polled_clients = clients_.size();  // handle_ctrl never adds clients, but be exact
+    for (size_t i = 0; i < polled_clients; ++i) {
+      Client& c = *clients_[i];
+      short ev = fds[base + i].revents;
+      if (ev & POLLOUT) flush(c);
+      if ((ev & (POLLIN | POLLHUP | POLLERR)) && !handle_client(c)) c.dead = true;
     }
+    base += polled_clients;
+    for (size_t i = 0; i < polled.size(); ++i) {
+      short ev = fds[base + i].revents;
+      if (ev & POLLOUT) polled[i]->flush_input();
+      if (ev & (POLLIN | POLLHUP)) pump_session(*polled[i]);
+    }
+    std::erase_if(clients_, [](const auto& c) {
+      if (c->dead) close(c->fd);
+      return c->dead;
+    });
     if (fds[0].revents & POLLIN) accept_client();
   }
   for (auto& [id, s] : sessions_) s->kill_tree();
@@ -111,6 +128,7 @@ void Server::accept_client() {
   int fd = accept(listen_fd_, nullptr, nullptr);
   if (fd < 0) return;
   fcntl(fd, F_SETFD, FD_CLOEXEC);
+  proto::set_nonblocking(fd);
   auto c = std::make_unique<Client>();
   c->fd = fd;
   clients_.push_back(std::move(c));
@@ -119,6 +137,7 @@ void Server::accept_client() {
 bool Server::handle_client(Client& c) {
   char buf[65536];
   ssize_t n = ::read(c.fd, buf, sizeof buf);
+  if (n < 0 && (errno == EAGAIN || errno == EINTR)) return true;
   if (n <= 0) return false;
   c.reader.feed(std::string_view(buf, static_cast<size_t>(n)));
   while (auto f = c.reader.next()) {
@@ -134,7 +153,26 @@ bool Server::handle_client(Client& c) {
 }
 
 void Server::send(Client& c, proto::Type type, uint32_t channel, const std::string& payload) {
-  proto::write_all(c.fd, proto::encode({type, channel, payload}));
+  if (c.dead) return;
+  c.out += proto::encode({type, channel, payload});
+  flush(c);
+  if (c.out.size() > kMaxQueued) c.dead = true;
+}
+
+void Server::flush(Client& c) {
+  size_t off = 0;
+  while (off < c.out.size()) {
+    ssize_t n = ::write(c.fd, c.out.data() + off, c.out.size() - off);
+    if (n > 0) {
+      off += static_cast<size_t>(n);
+    } else if (n < 0 && errno == EINTR) {
+      continue;
+    } else {
+      if (n < 0 && errno != EAGAIN) c.dead = true;
+      break;
+    }
+  }
+  c.out.erase(0, off);
 }
 
 void Server::reply(Client& c, const json::Value& request, json::Object body, bool ok, const std::string& error) {

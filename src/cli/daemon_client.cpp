@@ -21,6 +21,7 @@
 
 #include "cli/common.hpp"
 #include "core/i18n.hpp"
+#include "core/runs.hpp"
 #include "proto/socket.hpp"
 
 namespace apron::cli {
@@ -48,6 +49,10 @@ std::string aprond_path() {
 }  // namespace
 
 bool record(const Project& project, const Event& event, std::string* error) {
+  if (!valid_run_id(event.run)) {
+    if (error) *error = trf("not a run id: {}", {event.run});
+    return false;
+  }
   if (!append_event(project.run_file(event.run), event, error)) return false;
   int fd = proto::connect_unix(proto::socket_path());
   if (fd < 0) return true;  // no daemon: the file is enough
@@ -70,6 +75,10 @@ DaemonClient::~DaemonClient() {
 }
 
 bool DaemonClient::connect_ssh(const std::string& host, const std::string& remote, std::string* error) {
+  if (host.empty() || host[0] == '-') {  // "-oProxyCommand=..." would be an option to ssh, not a host
+    if (error) *error = trf("not a host: {}", {host});
+    return false;
+  }
   std::vector<std::string> argv;
   const char* ssh = std::getenv("APRON_SSH");
   std::istringstream words(ssh && *ssh ? ssh : "ssh");

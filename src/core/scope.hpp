@@ -26,8 +26,13 @@ bool always_in_scope(std::string_view path);
 
 ScopeReport check_scope(const std::vector<std::string>& files, const std::vector<std::string>& scope);
 
-// Runs a command in `dir` and returns its standard output, or nullopt on failure.
-std::optional<std::string> capture(const std::string& command, const std::filesystem::path& dir);
+// Runs a program in `dir`, with no shell in between, and returns its standard
+// output, or nullopt when it fails. Values read from .apron/ (run ids, commits)
+// are arguments here, never shell text.
+std::optional<std::string> capture(const std::vector<std::string>& argv, const std::filesystem::path& dir);
+
+// A commit id as git prints it: hex only, so it can never pass for an option.
+bool is_commit_id(std::string_view s);
 
 std::optional<std::string> git_head(const std::filesystem::path& root);
 // The commit HEAD pointed to at a moment, for runs that did not record a base.

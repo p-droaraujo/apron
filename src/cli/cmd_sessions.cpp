@@ -8,6 +8,7 @@
 #include <atomic>
 #include <cstdlib>
 #include <cstring>
+#include <charconv>
 #include <cstdio>
 #include <filesystem>
 
@@ -34,11 +35,15 @@ void term_size(int& cols, int& rows) {
 
 std::optional<DaemonClient> connect(bool autostart) { return connect_to("", autostart); }
 
-// "nexus:3" is session 3 on nexus; "3" is session 3 here.
+// "nexus:3" is session 3 on nexus; "3" is session 3 here. 0 means not a session.
 std::pair<std::string, uint32_t> target(const std::string& arg) {
   auto colon = arg.rfind(':');
-  if (colon == std::string::npos) return {"", static_cast<uint32_t>(std::atoi(arg.c_str()))};
-  return {arg.substr(0, colon), static_cast<uint32_t>(std::atoi(arg.c_str() + colon + 1))};
+  std::string host = colon == std::string::npos ? "" : arg.substr(0, colon);
+  std::string_view num = colon == std::string::npos ? std::string_view(arg) : std::string_view(arg).substr(colon + 1);
+  uint32_t id = 0;
+  auto [end, ec] = std::from_chars(num.data(), num.data() + num.size(), id);
+  if (ec != std::errc() || end != num.data() + num.size()) id = 0;
+  return {host, id};
 }
 
 constexpr char kDetachKey = 0x1d;  // Ctrl-]
@@ -174,6 +179,7 @@ int cmd_ls(const Args& args) {
 int cmd_attach(const Args& args) {
   if (args.pos.empty()) return fail(tr("usage: apron attach [<machine>:]<session>"));
   auto [host, id] = target(args.pos[0]);
+  if (id == 0) return fail(trf("no session {}", {args.pos[0]}));
   auto c = connect_to(host, false);
   if (!c) return 1;
   return attach(*c, id);
@@ -182,6 +188,7 @@ int cmd_attach(const Args& args) {
 int cmd_kill(const Args& args) {
   if (args.pos.empty()) return fail(tr("usage: apron kill [<machine>:]<session>"));
   auto [host, id] = target(args.pos[0]);
+  if (id == 0) return fail(trf("no session {}", {args.pos[0]}));
   auto c = connect_to(host, false);
   if (!c) return 1;
   json::Object req;

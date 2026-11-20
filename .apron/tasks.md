@@ -101,3 +101,10 @@ Apron's own plan, in the format described in `docs/agent-protocol.md`.
   depends: T7, T11
   done-when: Enter on a running card whose run recorded a session leaves the TUI, attaches to that session, and Ctrl-] comes back to the TUI
   checks: build, test
+
+## Quality
+
+- [x] T17 Code review pass: Release by default, a daemon that never blocks on a slow client or agent, git without a shell, cached run summaries
+  scope: src/**, tests/**, CMakeLists.txt, README.md
+  done-when: sanitizers (ASan, UBSan, leaks) stay clean on every test; a stalled client cannot freeze aprond; no value read from .apron/ reaches a shell; the board reloads 300 runs without re-reading unchanged files
+  checks: build, test

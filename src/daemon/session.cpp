@@ -7,6 +7,7 @@
 #include <termios.h>
 #include <unistd.h>
 
+#include <algorithm>
 #include <cerrno>
 #include <cstring>
 #include <fstream>
@@ -89,19 +90,33 @@ std::string Session::read_output() {
     }
     break;  // EAGAIN, or EIO once the child is gone
   }
+  // Trim in batches: erasing the front on every read would copy 256 KB each time.
   replay_ += out;
-  if (replay_.size() > kReplayBytes) replay_.erase(0, replay_.size() - kReplayBytes);
+  if (replay_.size() > 2 * kReplayBytes) replay_.erase(0, replay_.size() - kReplayBytes);
   return out;
 }
 
+std::string Session::replay() const {
+  return replay_.size() > kReplayBytes ? replay_.substr(replay_.size() - kReplayBytes) : replay_;
+}
+
 void Session::write_input(const std::string& bytes) {
+  if (!alive_) return;
+  constexpr size_t kMaxPending = 1024 * 1024;  // a program that never reads loses the excess
+  pending_in_.append(bytes, 0, std::min(bytes.size(), kMaxPending - std::min(kMaxPending, pending_in_.size())));
+  flush_input();
+}
+
+void Session::flush_input() {
   size_t off = 0;
-  while (alive_ && off < bytes.size()) {
-    ssize_t n = ::write(master_, bytes.data() + off, bytes.size() - off);
-    if (n < 0 && (errno == EAGAIN || errno == EINTR)) continue;
-    if (n <= 0) return;
-    off += static_cast<size_t>(n);
+  while (alive_ && off < pending_in_.size()) {
+    ssize_t n = ::write(master_, pending_in_.data() + off, pending_in_.size() - off);
+    if (n > 0) off += static_cast<size_t>(n);
+    else if (n < 0 && errno == EINTR) continue;
+    else break;  // EAGAIN: the rest waits for POLLOUT
   }
+  pending_in_.erase(0, off);
+  if (!alive_) pending_in_.clear();
 }
 
 void Session::resize(int cols, int rows) {

@@ -6,6 +6,9 @@
 #include <fstream>
 #include <sstream>
 
+#include "core/review.hpp"
+#include "core/runs.hpp"
+#include "core/scope.hpp"
 #include "test.hpp"
 
 namespace fs = std::filesystem;
@@ -87,4 +90,27 @@ TEST("review: main that moved on is never merged over") {
   r.sh("git add other.txt && git commit -q -m other");
   CHECK(r.sh(r.apron + " review " + run + " merge").find("rebase") != std::string::npos);
   CHECK(!fs::exists(r.dir / "feature.txt"));
+}
+
+TEST("safety: values from .apron/ never reach a shell or pass for git options") {
+  using namespace apron;
+  CHECK(valid_run_id("r-T8-20261120-052741"));
+  CHECK(!valid_run_id(""));
+  CHECK(!valid_run_id("../../etc/passwd"));
+  CHECK(!valid_run_id("-oops"));
+  CHECK(!valid_run_id("x'; touch pwned; '"));
+  CHECK(is_commit_id("9057948828"));
+  CHECK(!is_commit_id("--output=/tmp/x"));
+
+  fs::path root = fs::temp_directory_path() / ("apron-safe-" + std::to_string(::getpid()));
+  fs::remove_all(root);
+  fs::create_directories(root / ".apron" / "runs");
+  [[maybe_unused]] int rc = std::system(("cd " + root.string() + " && git init -q && git -c user.email=t@t -c user.name=t commit -q --allow-empty -m base").c_str());
+  fs::path pwned = root / "pwned";
+  Project p{root};
+  run_changes(p, "x'; touch " + pwned.string() + "; '");
+  CHECK(git_changed_files(root, "--output=" + pwned.string()).empty());
+  CHECK(!fs::exists(pwned));
+  CHECK(!review_return(p, "../../x", "comment").empty());
+  fs::remove_all(root);
 }

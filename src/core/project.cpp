@@ -5,6 +5,8 @@
 #include <cstdlib>
 #include <fstream>
 
+#include "core/runs.hpp"
+
 namespace apron {
 
 namespace fs = std::filesystem;
@@ -25,7 +27,7 @@ std::optional<Project> find_project(fs::path start) {
 std::optional<std::string> Project::current_run() const {
   std::ifstream in(current_file());
   std::string run;
-  if (in >> run && !run.empty()) return run;
+  if (in >> run && valid_run_id(run)) return run;  // the file is data: never a path
   return std::nullopt;
 }
 

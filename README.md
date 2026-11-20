@@ -95,4 +95,4 @@ Design docs are in Portuguese for now:
 
 ## Requirements
 
-C++20 (GCC 13+ or Clang 16+), CMake 3.25+, Ninja. Linux or macOS (on a Mac: `xcode-select --install` and `brew install cmake ninja`). No other dependencies yet.
+C++20 (GCC 13+ or Clang 16+), CMake 3.25+, Ninja. Builds are optimized (Release) unless you pass `-DCMAKE_BUILD_TYPE=Debug`; an existing `build/` keeps the type it was configured with, so run `cmake -S . -B build -DCMAKE_BUILD_TYPE=Release` once. Linux or macOS (on a Mac: `xcode-select --install` and `brew install cmake ninja`). No other dependencies yet.

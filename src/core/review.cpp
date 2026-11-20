@@ -18,9 +18,17 @@ std::string trim(std::string s) {
   return a == std::string::npos ? "" : s.substr(a, b - a + 1);
 }
 
-std::string git(const Project& p, const std::string& args) { return trim(capture("git " + args, p.root).value_or("")); }
+std::string git(const Project& p, std::vector<std::string> args) {
+  args.insert(args.begin(), "git");
+  return trim(capture(args, p.root).value_or(""));
+}
+bool git_ok(const Project& p, std::vector<std::string> args) {
+  args.insert(args.begin(), "git");
+  return capture(args, p.root).has_value();
+}
 
 bool record_review(const Project& project, const std::string& run, const std::string& action, const std::string& msg) {
+  if (!valid_run_id(run)) return false;
   auto events = load_events(project.run_file(run));
   if (events.empty()) return false;
   Event e;
@@ -60,15 +68,17 @@ std::vector<RunSummary> review_queue(const Project& project) {
 RunChanges run_changes(const Project& project, const std::string& run) {
   RunChanges c;
   // The run's commit carries its id in the Apron-Run trailer (see the protocol).
-  c.commit = git(project, "log --all -1 --format=%H --grep='^Apron-Run: " + run + "$'");
-  if (c.commit.empty()) {
+  if (!valid_run_id(run)) return c;
+  c.commit = git(project, {"log", "--all", "-1", "--format=%H", "--grep=^Apron-Run: " + run + "$"});
+  if (!is_commit_id(c.commit)) {
+    c.commit.clear();
     auto events = load_events(project.run_file(run));
     std::string base = events.empty() ? "" : events.front().extra_str("base");
-    if (!base.empty()) c.stat = git(project, "diff --stat " + base);
+    if (is_commit_id(base)) c.stat = git(project, {"diff", "--stat", base});
     return c;
   }
-  c.stat = git(project, "show --stat --format= " + c.commit);
-  std::istringstream branches(git(project, "branch --contains " + c.commit + " --format='%(refname:short)'"));
+  c.stat = git(project, {"show", "--stat", "--format=", c.commit});
+  std::istringstream branches(git(project, {"branch", "--contains", c.commit, "--format=%(refname:short)"}));
   std::string b;
   while (std::getline(branches, b)) {
     b = trim(b);
@@ -82,15 +92,15 @@ std::string review_merge(const Project& project, const std::string& run) {
   RunChanges c = run_changes(project, run);
   if (c.commit.empty()) return tr("the run has no commit with its Apron-Run trailer yet");
   // Already in main? Then there is nothing to move, only to record.
-  bool in_main = capture("git merge-base --is-ancestor " + c.commit + " main", project.root).has_value();
+  bool in_main = git_ok(project, {"merge-base", "--is-ancestor", c.commit, "main"});
   if (!in_main) {
-    if (!capture("git merge-base --is-ancestor main " + c.commit, project.root))
+    if (!git_ok(project, {"merge-base", "--is-ancestor", "main", c.commit}))
       return tr("main has moved on since this run; rebase its branch onto main first");
-    if (git(project, "rev-parse --abbrev-ref HEAD") == "main") {
-      if (!git(project, "status --porcelain --untracked-files=no").empty())
+    if (git(project, {"rev-parse", "--abbrev-ref", "HEAD"}) == "main") {
+      if (!git(project, {"status", "--porcelain", "--untracked-files=no"}).empty())
         return tr("main has uncommitted changes; commit or stash them first");
-      if (!capture("git merge --ff-only " + c.commit, project.root)) return tr("git could not fast-forward main");
-    } else if (!capture("git fetch . " + c.commit + ":main", project.root)) {
+      if (!git_ok(project, {"merge", "--ff-only", c.commit})) return tr("git could not fast-forward main");
+    } else if (!git_ok(project, {"fetch", ".", c.commit + ":main"})) {
       return tr("git could not fast-forward main");
     }
   }
@@ -99,6 +109,7 @@ std::string review_merge(const Project& project, const std::string& run) {
 }
 
 std::string review_return(const Project& project, const std::string& run, const std::string& comment) {
+  if (!valid_run_id(run)) return trf("run not found: {}", {run});
   if (trim(comment).empty()) return tr("returning a run needs a comment for the agent");
   auto events = load_events(project.run_file(run));
   if (events.empty()) return trf("run not found: {}", {run});
@@ -108,6 +119,7 @@ std::string review_return(const Project& project, const std::string& run, const 
 }
 
 std::string review_discard(const Project& project, const std::string& run) {
+  if (!valid_run_id(run)) return trf("run not found: {}", {run});
   auto events = load_events(project.run_file(run));
   if (events.empty()) return trf("run not found: {}", {run});
   record_review(project, run, "discarded", "");

@@ -1,6 +1,12 @@
 #include "core/scope.hpp"
 
+#include <fcntl.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
 #include <array>
+#include <cctype>
+#include <cerrno>
 #include <cstdio>
 #include <set>
 #include <sstream>
@@ -58,12 +64,6 @@ std::string trim(std::string s) {
   return a == std::string::npos ? "" : s.substr(a, b - a + 1);
 }
 
-std::string shell_quote(const std::string& s) {
-  std::string out = "'";
-  for (char c : s) out += c == '\'' ? std::string("'\\''") : std::string(1, c);
-  return out + "'";
-}
-
 }  // namespace
 
 bool glob_match(std::string_view pattern, std::string_view path) {
@@ -95,28 +95,61 @@ ScopeReport check_scope(const std::vector<std::string>& files, const std::vector
   return r;
 }
 
-std::optional<std::string> capture(const std::string& command, const std::filesystem::path& dir) {
-  std::string full = "cd " + shell_quote(dir.string()) + " && " + command + " 2>/dev/null";
-  FILE* pipe = popen(full.c_str(), "r");
-  if (!pipe) return std::nullopt;
-  std::string out;
+std::optional<std::string> capture(const std::vector<std::string>& argv, const std::filesystem::path& dir) {
+  if (argv.empty()) return std::nullopt;
+  int out[2];
+  if (pipe(out) != 0) return std::nullopt;
+  pid_t pid = fork();
+  if (pid < 0) {
+    close(out[0]);
+    close(out[1]);
+    return std::nullopt;
+  }
+  if (pid == 0) {
+    int null = open("/dev/null", O_RDWR);
+    dup2(null, STDIN_FILENO);
+    dup2(out[1], STDOUT_FILENO);
+    dup2(null, STDERR_FILENO);
+    close(out[0]);
+    close(out[1]);
+    if (chdir(dir.c_str()) != 0) _exit(127);
+    std::vector<char*> args;
+    args.reserve(argv.size() + 1);
+    for (const auto& a : argv) args.push_back(const_cast<char*>(a.c_str()));
+    args.push_back(nullptr);
+    execvp(args[0], args.data());
+    _exit(127);
+  }
+  close(out[1]);
+  std::string text;
   std::array<char, 4096> buf{};
-  size_t n;
-  while ((n = fread(buf.data(), 1, buf.size(), pipe)) > 0) out.append(buf.data(), n);
-  int status = pclose(pipe);
-  if (status != 0) return std::nullopt;
-  return out;
+  ssize_t n;
+  while ((n = ::read(out[0], buf.data(), buf.size())) > 0 || (n < 0 && errno == EINTR))
+    if (n > 0) text.append(buf.data(), static_cast<size_t>(n));
+  close(out[0]);
+  int status = 0;
+  while (waitpid(pid, &status, 0) < 0 && errno == EINTR) {
+  }
+  if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) return std::nullopt;
+  return text;
+}
+
+bool is_commit_id(std::string_view s) {
+  if (s.size() < 4 || s.size() > 64) return false;
+  for (char c : s)
+    if (!std::isxdigit(static_cast<unsigned char>(c))) return false;
+  return true;
 }
 
 std::optional<std::string> git_head(const std::filesystem::path& root) {
-  auto out = capture("git rev-parse HEAD", root);
+  auto out = capture({"git", "rev-parse", "HEAD"}, root);
   if (!out) return std::nullopt;
   std::string head = trim(*out);
   return head.empty() ? std::nullopt : std::optional<std::string>(head);
 }
 
 std::optional<std::string> git_commit_at(const std::filesystem::path& root, int64_t ts_ms) {
-  auto out = capture("git rev-list -1 --before=@" + std::to_string(ts_ms / 1000) + " HEAD", root);
+  auto out = capture({"git", "rev-list", "-1", "--before=@" + std::to_string(ts_ms / 1000), "HEAD"}, root);
   if (!out) return std::nullopt;
   std::string commit = trim(*out);
   return commit.empty() ? std::nullopt : std::optional<std::string>(commit);
@@ -134,9 +167,10 @@ std::vector<std::string> git_changed_files(const std::filesystem::path& root, co
     }
   };
   // Committed since base, plus what is staged or unstaged in the working tree.
-  add_lines(capture("git diff --name-only " + shell_quote(base), root));
-  add_lines(capture("git diff --name-only " + shell_quote(base) + " HEAD", root));
-  add_lines(capture("git ls-files --others --exclude-standard", root));
+  if (!is_commit_id(base)) return {};  // it comes from the run's file: never let it pass for an option
+  add_lines(capture({"git", "diff", "--name-only", base}, root));
+  add_lines(capture({"git", "diff", "--name-only", base, "HEAD"}, root));
+  add_lines(capture({"git", "ls-files", "--others", "--exclude-standard"}, root));
   return {files.begin(), files.end()};
 }
 

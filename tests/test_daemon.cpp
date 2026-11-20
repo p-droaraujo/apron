@@ -142,3 +142,44 @@ TEST("aprond: spawn, list with the foreground program, attach, kill, stop") {
   close(c.fd);
   fs::remove_all(dir);
 }
+
+TEST("aprond: a client that stops reading cannot freeze the daemon") {
+  fs::path dir = fs::temp_directory_path() / ("apron-stall-" + std::to_string(::getpid()));
+  fs::create_directories(dir);
+  fs::path sock = dir / "aprond.sock";
+  pid_t daemon = fork();
+  if (daemon == 0) {
+    setenv("APRON_SOCKET", sock.c_str(), 1);
+    execl(APRON_BINARY_DIR "/aprond", "aprond", static_cast<char*>(nullptr));
+    _exit(127);
+  }
+  Conn slow, other;
+  for (int i = 0; i < 100 && slow.fd < 0; ++i) {
+    slow.fd = proto::connect_unix(sock);
+    if (slow.fd < 0) std::this_thread::sleep_for(std::chrono::milliseconds(20));
+  }
+  other.fd = proto::connect_unix(sock);
+  CHECK(slow.fd >= 0 && other.fd >= 0);
+
+  // A session that floods its terminal, and a client attached to it that never reads.
+  json::Array argv{"yes", "a line of output that keeps coming"};
+  auto spawned = slow.ask({{"cmd", "sessions.spawn"}, {"argv", argv}, {"cwd", dir.string()}});
+  long long id = spawned ? static_cast<long long>(spawned->find("session")->num()) : 0;
+  json::Object attach{{"id", 99}, {"cmd", "sessions.attach"}, {"session", id}};
+  proto::write_all(slow.fd, proto::encode({proto::Type::Ctrl, 0, json::dump(json::Value(std::move(attach)))}));
+  std::this_thread::sleep_for(std::chrono::milliseconds(1500));  // well past any socket buffer
+
+  // Everyone else is still served, quickly.
+  auto t0 = std::chrono::steady_clock::now();
+  auto list = other.ask({{"cmd", "sessions.list"}});
+  auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - t0).count();
+  CHECK(list.has_value());
+  CHECK(ms < 1000);
+
+  other.ask({{"cmd", "sessions.kill"}, {"session", id}});
+  other.ask({{"cmd", "daemon.stop"}});
+  waitpid(daemon, nullptr, 0);
+  close(slow.fd);
+  close(other.fd);
+  fs::remove_all(dir);
+}

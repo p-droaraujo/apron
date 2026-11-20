@@ -37,6 +37,7 @@ class DaemonClient {
   int fd() const { return fd_; }
 
  private:
+  std::optional<proto::Frame> read_frame(int timeout_ms);
   int fd_ = -1;
   int ssh_ = -1;      // pid of the ssh child, if any
   int ssh_err_ = -1;  // its stderr, read for the reason when it fails

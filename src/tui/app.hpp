@@ -24,6 +24,7 @@ struct SessionRow {
   std::string cwd;
   SessionState state = SessionState::Idle;
   int64_t since_ms = 0;
+  int cols = 80, rows = 24;  // the size the program draws for
 };
 
 struct ProjectGroup {
@@ -62,7 +63,7 @@ std::vector<SideRow> side_rows(const Fleet& fleet);
 
 // --- What the mouse can hit ---------------------------------------------------
 
-enum class Act { None, Tab, Side, Card, Button, NewSession, AddMachine };
+enum class Act { None, Tab, Side, Card, Button, NewSession, AddMachine, Tile };
 
 struct Hit {
   int x = 0, y = 0, w = 0, h = 0;
@@ -98,6 +99,16 @@ Rect render_main_frame(Screen& sc, Rect r, const std::string& title, const std::
                        bool focused, std::vector<Hit>& hits);
 void render_board(Screen& sc, Rect r, const Model& model, const View& view, bool focused,
                   const std::vector<Button>& buttons, int64_t now_ms, std::vector<Hit>& hits);
+// The grid: one tile per live session, its terminal drawn from the bottom.
+struct Tile {
+  std::string title;
+  const class Vt* vt = nullptr;
+};
+void render_grid(Screen& sc, Rect r, const std::vector<Tile>& tiles, int selected, bool focused,
+                 std::vector<Hit>& hits);
+// How many tiles fit side by side, for moving up and down.
+int grid_columns(Rect r, size_t tiles);
+
 void render_footer(Screen& sc, const std::vector<std::pair<std::string, std::string>>& keys, const std::string& status);
 // A small box in the middle of `r`: a line of text being typed, or a question.
 void render_prompt(Screen& sc, Rect r, const std::string& title, const std::string& text, bool typing);

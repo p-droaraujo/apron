@@ -234,7 +234,8 @@ void Server::handle_ctrl(Client& c, const std::string& payload) {
     Session& s = *it->second;
     if (cmd == "sessions.attach") {
       c.attached.insert(id);
-      if (s.alive()) s.resize(num(*req, "cols", 80), num(*req, "rows", 24));
+      // A viewer that only watches (the grid) sends no size and changes nothing.
+      if (s.alive() && req->find("cols")) s.resize(num(*req, "cols", 80), num(*req, "rows", 24));
       reply(c, *req, {});
       // Replay the recent output so the client sees where things stand.
       send(c, proto::Type::Data, id, s.replay());

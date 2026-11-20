@@ -82,6 +82,8 @@ const std::unordered_map<std::string_view, std::string_view>& pt_br() {
       {"Progress", "Andamento"},
       {"Review", "Revisão"},
       {"Activity", "Atividade"},
+      {"Agents", "Agentes"},
+      {"No agent is running. n starts one.", "Nenhum agente rodando. n inicia um."},
       {"merged", "mesclada"},
       {"returned to the agent", "devolvida ao agente"},
       {"discarded", "descartada"},

@@ -189,6 +189,10 @@ std::optional<proto::Frame> DaemonClient::next(int timeout_ms) {
     queued_.erase(queued_.begin());
     return f;
   }
+  return read_frame(timeout_ms);
+}
+
+std::optional<proto::Frame> DaemonClient::read_frame(int timeout_ms) {
   while (true) {
     if (auto f = reader_.next()) return f;
     pollfd pfd{fd_, POLLIN, 0};
@@ -209,7 +213,9 @@ std::optional<json::Value> DaemonClient::request(json::Object body, std::string*
     return std::nullopt;
   }
   while (true) {
-    auto f = next(timeout_ms_);
+    // Straight from the socket: frames already queued are not the answer, and
+    // taking them from the queue only to queue them again would never end.
+    auto f = read_frame(timeout_ms_);
     if (!f) {
       if (error) *error = tr("aprond did not answer");
       return std::nullopt;

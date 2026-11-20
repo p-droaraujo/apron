@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <filesystem>
+#include <map>
 #include <memory>
 
 #include "cli/common.hpp"
@@ -56,6 +57,14 @@ bool is_detach(const std::string& raw) {
   return raw == "\x1d" || raw == "\x1b[93;5u" || raw == "\x1b[27;5;93~";
 }
 
+// A session watched in the grid: its terminal drawn at the size it has.
+struct Watched {
+  std::string host;
+  uint32_t id = 0;
+  std::string title;
+  std::unique_ptr<tui::Vt> vt;
+};
+
 bool has_project(const std::string& root) {
   std::error_code ec;
   return !root.empty() && std::filesystem::is_directory(std::filesystem::path(root) / ".apron", ec);
@@ -82,7 +91,12 @@ int cmd_ui(const Args&) {
   enum class Overlay { None, Log, Task, Review, Help, Prompt, Confirm, Focus } overlay = Overlay::None;
   std::unique_ptr<Focus> focus;
   enum class Ask { NewSession, AddMachine, Return } asking = Ask::NewSession;
-  int tab = 0;  // 0 the board, 1 the activity
+  // The views Tab cycles through.
+  enum { kBoard = 0, kGrid = 1, kActivity = 2, kViews = 3 };
+  int tab = kBoard;
+  std::map<std::string, std::unique_ptr<DaemonClient>> grid_clients;  // one connection per machine
+  std::vector<Watched> grid;
+  int grid_sel = 0;
   bool side = false;
   int side_sel = 0;
   std::vector<ActivityItem> activity;
@@ -94,6 +108,7 @@ int cmd_ui(const Args&) {
   uint32_t kill_id = 0;
   int64_t last_load = 0, status_until = 0;
   std::vector<tui::Hit> hits;
+  tui::Rect in_last;
 
   auto say = [&](const std::string& s) {
     status = s;
@@ -115,7 +130,7 @@ int cmd_ui(const Args&) {
       model = tui::load_model(*project);
     }
     tui::clamp_selection(model, view);
-    if (tab == 1) activity = load_activity(local_roots(), 500);
+    if (tab == kActivity) activity = load_activity(local_roots(), 500);
     int rows = static_cast<int>(tui::side_rows(fleet).size());
     side_sel = std::clamp(side_sel, 0, std::max(0, rows - 1));
   };
@@ -323,10 +338,83 @@ int cmd_ui(const Args&) {
                               : trf("End session {} ({}) on {}?", {std::to_string(s.id), s.what, s.machine});
     overlay = Overlay::Confirm;
   };
+  // The grid watches every live session without resizing it: one connection
+  // per machine, every session attached on it, each drawn at its own size.
+  auto leave_grid = [&] {
+    for (auto& w : grid) {
+      auto c = grid_clients.find(w.host);
+      if (c == grid_clients.end()) continue;
+      json::Object req;
+      req.emplace_back("cmd", "sessions.detach");
+      req.emplace_back("session", static_cast<long long>(w.id));
+      c->second->send({proto::Type::Ctrl, 0, json::dump(json::Value(std::move(req)))});
+    }
+    grid.clear();
+    grid_clients.clear();
+  };
+  auto sync_grid = [&] {
+    std::vector<std::tuple<std::string, uint32_t, std::string, int, int>> live;
+    std::map<std::string, bool> reachable;
+    for (const auto& m : fleet.machines) reachable[m.here ? "" : m.name] = m.ok || m.here;
+    for (const auto& g : fleet.projects)
+      for (const auto& s : g.sessions)
+        if (s.state != tui::SessionState::Exited && reachable[s.machine])
+          live.emplace_back(s.machine, s.id, s.what + (s.machine.empty() ? "" : "@" + s.machine) + " · " + g.name,
+                            s.cols, s.rows);
+    std::erase_if(grid, [&](const Watched& w) {
+      for (const auto& [h, id, t, c, r] : live)
+        if (h == w.host && id == w.id) return false;
+      return true;
+    });
+    for (const auto& [host, id, title, cols, rows] : live) {
+      bool known = false;
+      for (auto& w : grid)
+        if (w.host == host && w.id == id) known = true, w.title = title;
+      if (known) continue;
+      auto& client = grid_clients[host];
+      if (!client) {
+        auto c = std::make_unique<DaemonClient>();
+        std::string err;
+        bool ok;
+        if (host.empty()) {
+          ok = c->connect(true, &err);
+        } else {
+          auto all = load_machines();
+          const Machine* m = find_machine(all, host);
+          ok = c->connect_ssh(host, m ? m->remote : "apron", &err);
+        }
+        if (!ok) {
+          grid_clients.erase(host);
+          continue;
+        }
+        client = std::move(c);
+      }
+      json::Object req;
+      req.emplace_back("cmd", "sessions.attach");
+      req.emplace_back("session", static_cast<long long>(id));
+      std::string err;
+      if (!client->request(std::move(req), &err)) continue;
+      grid.push_back({host, id, title, std::make_unique<tui::Vt>(cols, rows)});
+    }
+    grid_sel = std::clamp(grid_sel, 0, std::max(0, static_cast<int>(grid.size()) - 1));
+  };
+  auto drain_grid = [&] {
+    for (auto& [host, client] : grid_clients)
+      while (auto f = client->next(0)) {
+        if (f->type != proto::Type::Data) continue;
+        for (auto& w : grid)
+          if (w.host == host && w.id == f->channel) {
+            w.vt->feed(f->payload);
+            w.vt->take_replies();  // only the terminal the agent draws for answers its questions
+          }
+      }
+  };
   auto set_tab = [&](int t) {
-    tab = (t + 2) % 2;
+    tab = (t + kViews) % kViews;
+    if (tab == kGrid) sync_grid();
     overlay = Overlay::None;
-    if (tab == 1) {
+    if (tab != kGrid) leave_grid();
+    if (tab == kActivity) {
       activity = load_activity(local_roots(), 500);
       activity_scroll = 0;
     }
@@ -336,6 +424,7 @@ int cmd_ui(const Args&) {
     int64_t now = timeutil::now_ms();
     if (now - last_load >= 1000) {
       reload();
+      if (tab == kGrid && overlay != Overlay::Focus) sync_grid();
       last_load = now;
     }
     if (!status.empty() && now > status_until) status.clear();
@@ -360,7 +449,7 @@ int cmd_ui(const Args&) {
           if (s.id == focus->id && s.machine == focus->host)
             title = s.what + (focus->host.empty() ? "" : "@" + focus->host) + " · " + g.name;
     }
-    tui::Rect in = tui::render_main_frame(screen, main_r, title, {tr("Progress"), tr("Activity")}, tab, !side, hits);
+    tui::Rect in = tui::render_main_frame(screen, main_r, title, {tr("Progress"), tr("Agents"), tr("Activity")}, tab, !side, hits);
     const tui::Item* sel = selected_item();
     std::vector<Button> buttons = buttons_for(sel);
     tui::Screen sub;
@@ -370,8 +459,9 @@ int cmd_ui(const Args&) {
     else if (overlay == Overlay::Task && project) tui::render_task(sub, *project, open_task);
     else if (overlay == Overlay::Review && project)
       tui::render_review(sub, *project, summarize(open_run, load_events(project->run_file(open_run))), stat);
-    else if (tab == 1) tui::render_activity(sub, activity, activity_scroll, now);
+    else if (tab == kActivity) tui::render_activity(sub, activity, activity_scroll, now);
     else drew_sub = false;
+    bool show_grid = !drew_sub && tab == kGrid && overlay != Overlay::Focus;
     if (overlay == Overlay::Focus && focus) {
       drew_sub = true;
       if (focus->vt.cols() != in.w || focus->vt.rows() != in.h) {
@@ -386,6 +476,11 @@ int cmd_ui(const Args&) {
       focus->vt.draw(screen, in.x, in.y, in.w, in.h, true);
     } else if (drew_sub) {
       screen.blit(sub, in.x, in.y);
+    } else if (show_grid) {
+      std::vector<tui::Tile> tiles;
+      for (const auto& w : grid) tiles.push_back({w.title, w.vt.get()});
+      tui::render_grid(screen, in, tiles, grid_sel, !side, hits);
+      in_last = in;
     }
     else if (project || !remote_host.empty()) tui::render_board(screen, in, model, view, !side, buttons, now, hits);
     else screen.put(in.x, in.y + 1, tr("No project in this folder. Pick one in the sidebar."), {});
@@ -420,7 +515,9 @@ int cmd_ui(const Args&) {
       case Overlay::None:
         if (side) {
           keys = {{"enter", tr("open")}, {"x", tr("remove")}, {"→", tr("board")}};
-        } else if (tab == 1) {
+        } else if (tab == kGrid) {
+          keys = {{"enter", tr("open")}, {"←→↑↓", tr("move")}};
+        } else if (tab == kActivity) {
           keys = {{"↑↓", tr("scroll")}};
         } else {
           // The card's own actions sit on its buttons, each with its key.
@@ -440,9 +537,13 @@ int cmd_ui(const Args&) {
     term.write(screen.flush());
 
     // --- Input --------------------------------------------------------------
-    tui::KeyEvent k = term.poll(focus ? 50 : 100, focus ? focus->client.fd() : -1);
+    std::vector<int> fds;
+    if (focus) fds.push_back(focus->client.fd());
+    for (const auto& [h, c] : grid_clients) fds.push_back(c->fd());
+    tui::KeyEvent k = term.poll(fds.empty() ? 100 : 50, fds);
     ++view.tick;
     if (focus) drain_focus();
+    if (!grid_clients.empty()) drain_grid();
     if (k.key == Key::None || k.key == Key::Wake) continue;
     if (k.key == Key::Resize) {
       screen.resize(term.width(), term.height());
@@ -520,6 +621,12 @@ int cmd_ui(const Args&) {
           break;
         case tui::Act::Button:
           if (sel) run_action(static_cast<Action>(h->a), *sel);
+          break;
+        case tui::Act::Tile:
+          if (!side && grid_sel == h->a && h->a < static_cast<int>(grid.size()))
+            open_terminal(grid[static_cast<size_t>(h->a)].host, grid[static_cast<size_t>(h->a)].id);
+          side = false;
+          grid_sel = h->a;
           break;
         case tui::Act::NewSession: start_new_session(); break;
         case tui::Act::AddMachine:
@@ -604,7 +711,19 @@ int cmd_ui(const Args&) {
       overlay = Overlay::Prompt;
       continue;
     }
-    if (tab == 1) {
+    if (tab == kGrid) {
+      int n = static_cast<int>(grid.size());
+      int cols = tui::grid_columns(in_last, grid.size());
+      if (left && grid_sel % cols == 0 && SW) side = true;
+      else if (left) --grid_sel;
+      if (right) ++grid_sel;
+      if (up) grid_sel -= cols;
+      if (down) grid_sel += cols;
+      grid_sel = std::clamp(grid_sel, 0, std::max(0, n - 1));
+      if (k.key == Key::Enter && grid_sel < n) open_terminal(grid[static_cast<size_t>(grid_sel)].host, grid[static_cast<size_t>(grid_sel)].id);
+      continue;
+    }
+    if (tab == kActivity) {
       if (up) activity_scroll = std::max(0, activity_scroll - 1);
       if (down) ++activity_scroll;
       if (left && SW) side = true;

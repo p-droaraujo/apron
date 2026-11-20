@@ -152,6 +152,11 @@ json::Value Session::describe() const {
   o.emplace_back("pid", static_cast<long long>(pid_));
   o.emplace_back("foreground", foreground());
   o.emplace_back("alive", alive_);
+  winsize ws{};
+  if (alive_ && ioctl(master_, TIOCGWINSZ, &ws) == 0) {
+    o.emplace_back("cols", static_cast<long long>(ws.ws_col));
+    o.emplace_back("rows", static_cast<long long>(ws.ws_row));
+  }
   o.emplace_back("created", timeutil::iso8601(created_ms_));
   if (!alive_) o.emplace_back("exit", WIFEXITED(exit_status_) ? WEXITSTATUS(exit_status_) : -1);
   return json::Value(std::move(o));

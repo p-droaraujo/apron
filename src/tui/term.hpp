@@ -2,6 +2,7 @@
 #pragma once
 
 #include <string>
+#include <vector>
 
 namespace apron::tui {
 
@@ -28,7 +29,7 @@ class Terminal {
 
   // Waits up to `timeout_ms` for a key or a resize; Key::Wake when `extra_fd`
   // (a session's connection) has data first.
-  KeyEvent poll(int timeout_ms, int extra_fd = -1);
+  KeyEvent poll(int timeout_ms, const std::vector<int>& extra_fds = {});
   void write(const std::string& bytes);
   // Hands the terminal to something else (an attached session) and takes it back.
   void suspend();
@@ -38,7 +39,7 @@ class Terminal {
   int w_ = 80, h_ = 24;
   bool ok_ = false;
   void query_size();
-  KeyEvent read_key(int timeout_ms, int extra_fd);
+  KeyEvent read_key(int timeout_ms, const std::vector<int>& extra_fds);
   static KeyEvent parse(const char* buf, long n);
 };
 

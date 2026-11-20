@@ -100,15 +100,16 @@ void Terminal::write(const std::string& bytes) {
   }
 }
 
-KeyEvent Terminal::poll(int timeout_ms, int extra_fd) { return read_key(timeout_ms, extra_fd); }
+KeyEvent Terminal::poll(int timeout_ms, const std::vector<int>& extra_fds) { return read_key(timeout_ms, extra_fds); }
 
-KeyEvent Terminal::read_key(int timeout_ms, int extra_fd) {
+KeyEvent Terminal::read_key(int timeout_ms, const std::vector<int>& extra_fds) {
   if (g_resized.exchange(false)) {
     query_size();
     return {Key::Resize, 0, ""};
   }
-  pollfd pfd[2] = {{STDIN_FILENO, POLLIN, 0}, {extra_fd, POLLIN, 0}};
-  int r = ::poll(pfd, extra_fd >= 0 ? 2 : 1, timeout_ms);
+  std::vector<pollfd> pfd{{STDIN_FILENO, POLLIN, 0}};
+  for (int fd : extra_fds) pfd.push_back({fd, POLLIN, 0});
+  int r = ::poll(pfd.data(), pfd.size(), timeout_ms);
   if (g_resized.exchange(false)) {
     query_size();
     return {Key::Resize, 0, ""};

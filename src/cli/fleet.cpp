@@ -77,6 +77,8 @@ void add_machine(tui::Fleet& fleet, const std::string& host, const json::Value& 
     std::string fg = s.get_str("foreground");
     row.what = fg.empty() ? s.get_str("command") : fg;
     row.since_ms = timeutil::parse_iso8601(s.get_str("created")).value_or(0);
+    if (const json::Value* c = s.find("cols"); c && c->is_number()) row.cols = static_cast<int>(c->num());
+    if (const json::Value* r = s.find("rows"); r && r->is_number()) row.rows = static_cast<int>(r->num());
     if (!alive) row.state = tui::SessionState::Exited;
     else if (kShells.count(fg)) row.state = tui::SessionState::Idle;
     else row.state = tui::SessionState::Working;

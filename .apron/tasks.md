@@ -108,7 +108,7 @@ See every agent on one screen and reach the right terminal in one keystroke.
   done-when: Enter on a session or a card's Terminal shows the agent inside Apron, typing reaches it, its output redraws live, Ctrl-] goes back, and the session follows the pane's size
   checks: build, test
 
-- [ ] T32 Grid: every running agent at once, each in a tile with its live output; Enter on a tile opens it in Focus
+- [x] T32 Grid: every running agent at once, each in a tile with its live output; Enter on a tile opens it in Focus
   scope: src/tui/**, src/cli/**, src/core/i18n.cpp, tests/**
   depends: T31
   done-when: a third view shows one tile per live session of every machine, updating as they write, and Enter or a click opens the tile in Focus

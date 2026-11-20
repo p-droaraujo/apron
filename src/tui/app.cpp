@@ -5,6 +5,7 @@
 #include "core/i18n.hpp"
 #include "core/time.hpp"
 #include "tui/palette.hpp"
+#include "tui/vt.hpp"
 
 namespace apron::tui {
 
@@ -317,6 +318,36 @@ void render_board(Screen& sc, Rect r, const Model& m, const View& v, bool focuse
     }
     if (i < static_cast<int>(items.size()) && y < bottom)
       sc.put(lx, std::min(y, bottom - 1), trf("{} more", {std::to_string(static_cast<int>(items.size()) - i)}), kDim);
+  }
+}
+
+int grid_columns(Rect r, size_t tiles) {
+  if (tiles == 0) return 1;
+  int max_cols = std::max(1, r.w / 44);  // a tile narrower than this reads as noise
+  int cols = 1;
+  while (cols < max_cols && static_cast<size_t>(cols * cols) < tiles) ++cols;
+  return std::min(cols, static_cast<int>(tiles));
+}
+
+void render_grid(Screen& sc, Rect r, const std::vector<Tile>& tiles, int selected, bool focused,
+                 std::vector<Hit>& hits) {
+  if (tiles.empty()) {
+    sc.put(r.x, r.y + 1, tr("No agent is running. n starts one."), kDim);
+    return;
+  }
+  int cols = grid_columns(r, tiles.size());
+  int rows = static_cast<int>((tiles.size() + static_cast<size_t>(cols) - 1) / static_cast<size_t>(cols));
+  int tw = (r.w - (cols - 1)) / cols, th = std::max(4, (r.h - (rows - 1)) / rows);
+  for (size_t i = 0; i < tiles.size(); ++i) {
+    int col = static_cast<int>(i) % cols, row = static_cast<int>(i) / cols;
+    Rect t{r.x + col * (tw + 1), r.y + row * (th + 1), tw, th};
+    if (t.y + t.h > r.y + r.h) break;
+    bool sel = focused && static_cast<int>(i) == selected;
+    for (int y = t.y; y < t.y + t.h; ++y) sc.fill(t.x, y, t.w, " ", kText);
+    draw_box(sc, t, sel ? kBlue : kLine, sel);
+    sc.put(t.x + 2, t.y, " " + fit(tiles[i].title, t.w - 6) + " ", sel ? kBold : kSoft);
+    if (tiles[i].vt) tiles[i].vt->draw(sc, t.x + 1, t.y + 1, t.w - 2, t.h - 2, false);
+    hits.push_back({t.x, t.y, t.w, t.h, Act::Tile, static_cast<int>(i), 0});
   }
 }
 

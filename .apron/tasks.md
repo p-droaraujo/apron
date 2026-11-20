@@ -120,3 +120,11 @@ Apron's own plan, in the format described in `docs/agent-protocol.md`.
   depends: T18
   done-when: project.toml and policy.toml are gone and nothing reads them; tasks.md keys are English only; `apron projects`, `apron scope` and the Review tab are gone with what they showed still reachable; settings.json calls `apron hook`; AGENTS.md points to docs/agent-protocol.md; every test passes
   checks: build, test
+
+## Release
+
+- [x] T21 Ready to be public: Apache-2.0 license, trademark policy, contributing and security guides, repository description and topics
+  scope: LICENSE, NOTICE, TRADEMARKS.md, CONTRIBUTING.md, SECURITY.md, README.md, .github/**
+  depends: T19
+  done-when: the files are in the repository, README links them, and the GitHub repository has a product description and topics; visibility stays a person's choice
+  checks: build, test

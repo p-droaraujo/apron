@@ -18,6 +18,8 @@ class FleetPoller {
 
   tui::Fleet snapshot() const;
   void poke();  // collect again now, after an action changed something
+  // Fetch the board of `root` on `host` with every round; "" stops.
+  void watch(const std::string& host, const std::string& root);
 
   struct State;
 

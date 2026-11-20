@@ -1,6 +1,7 @@
 #include "daemon/server.hpp"
 
 #include "core/activity.hpp"
+#include "core/board.hpp"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -284,6 +285,16 @@ void Server::handle_ctrl(Client& c, const std::string& payload) {
     }
     json::Object b;
     b.emplace_back("events", std::move(events));
+    reply(c, *req, std::move(b));
+  } else if (cmd == "project.board") {
+    // The board of a project this daemon knows, built from its files here.
+    std::string root = req->get_str("root");
+    json::Value projects = registry_.list();
+    bool known = false;
+    for (const auto& p : projects.arr()) known = known || p.get_str("root") == root;
+    if (!known) return reply(c, *req, {}, false, "not_found");
+    json::Object b;
+    b.emplace_back("board", board_to_json(load_model(Project{root})));
     reply(c, *req, std::move(b));
   } else if (cmd == "daemon.stop") {
     reply(c, *req, {});

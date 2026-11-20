@@ -10,6 +10,7 @@
 #include <thread>
 
 #include "cli/daemon_client.hpp"
+#include "core/board.hpp"
 #include "core/project.hpp"
 #include "core/runs.hpp"
 #include "core/time.hpp"
@@ -22,6 +23,7 @@ struct FleetPoller::State {
   bool stop = false;
   bool poked = false;
   bool done = false;
+  std::string watch_host, watch_root;
   tui::Fleet fleet;
 };
 
@@ -31,6 +33,7 @@ const std::set<std::string> kShells{"sh", "bash", "zsh", "fish", "dash", "ksh", 
 
 struct Remote {
   std::unique_ptr<DaemonClient> client;
+  std::string machine_name;
   int64_t last_try = 0;
   int64_t seen = 0;
   std::string error;
@@ -70,6 +73,7 @@ void add_machine(tui::Fleet& fleet, const std::string& host, const json::Value& 
     row.id = static_cast<uint32_t>(s.find("id") ? s.find("id")->num() : 0);
     row.cwd = s.get_str("cwd");
     bool alive = s.find("alive") && s.find("alive")->boolean();
+    if (!alive) continue;  // an ended session is history; the sidebar shows what runs
     std::string fg = s.get_str("foreground");
     row.what = fg.empty() ? s.get_str("command") : fg;
     row.since_ms = timeutil::parse_iso8601(s.get_str("created")).value_or(0);
@@ -95,6 +99,7 @@ void collect(FleetPoller::State& st, std::map<std::string, Remote>& remotes) {
   // This machine: starts aprond if needed, so its sessions always show.
   tui::MachineRow here;
   here.name = machine_name();
+  here.machine_name = here.name;
   here.here = true;
   DaemonClient local;
   std::string err;
@@ -122,16 +127,40 @@ void collect(FleetPoller::State& st, std::map<std::string, Remote>& remotes) {
       r.last_try = now;
       auto c = std::make_unique<DaemonClient>();
       std::string e;
-      if (c->connect_ssh(m.host, m.remote, &e)) r.client = std::move(c), r.error.clear();
-      else r.error = e;
+      if (c->connect_ssh(m.host, m.remote, &e)) {
+        if (auto h = ask(*c, "hello")) r.machine_name = h->get_str("machine");
+        r.client = std::move(c);
+        r.error.clear();
+      } else {
+        r.error = e;
+      }
     }
     tui::MachineRow row;
     row.name = m.host;
+    row.machine_name = r.machine_name;
     if (r.client) {
       auto s = ask(*r.client, "sessions.list");
       auto p = ask(*r.client, "projects.list");
       if (s && p && s->find("sessions") && p->find("projects")) {
         add_machine(fleet, m.host, *s->find("sessions"), *p->find("projects"), {});
+        std::string wh, wr;
+        {
+          std::lock_guard lock(st.mutex);
+          wh = st.watch_host;
+          wr = st.watch_root;
+        }
+        if (wh == m.host && !wr.empty()) {
+          json::Object req;
+          req.emplace_back("cmd", "project.board");
+          req.emplace_back("root", wr);
+          std::string e;
+          if (auto b = r.client->request(std::move(req), &e); b && b->find("board")) {
+            fleet.has_board = true;
+            fleet.board_host = wh;
+            fleet.board_root = wr;
+            fleet.board = board_from_json(*b->find("board"));
+          }
+        }
         r.seen = now;
         row.ok = true;
         for (const auto& x : s->find("sessions")->arr())
@@ -193,6 +222,14 @@ FleetPoller::~FleetPoller() {
 tui::Fleet FleetPoller::snapshot() const {
   std::lock_guard lock(state_->mutex);
   return state_->fleet;
+}
+
+void FleetPoller::watch(const std::string& host, const std::string& root) {
+  std::lock_guard lock(state_->mutex);
+  state_->watch_host = host;
+  state_->watch_root = root;
+  state_->poked = true;
+  state_->wake.notify_all();
 }
 
 void FleetPoller::poke() {

@@ -43,6 +43,7 @@ add_library(apron_core
   src/core/scope.cpp
   src/core/review.cpp
   src/core/activity.cpp
+  src/core/board.cpp
 )
 
 # The TUI: terminal, cell grid and the progress view.

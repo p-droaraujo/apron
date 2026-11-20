@@ -66,6 +66,8 @@ int cmd_ui(const Args&) {
   int activity_scroll = 0, scroll = 0;
   std::string open_run, open_task, stat, input, status;
   std::string kill_host, new_host, new_cwd, new_name;
+  // The board shows a project of another machine when remote_host is set.
+  std::string remote_host, remote_root, remote_name;
   uint32_t kill_id = 0;
   int64_t last_load = 0, status_until = 0;
   std::vector<tui::Hit> hits;
@@ -84,7 +86,11 @@ int cmd_ui(const Args&) {
   };
   auto reload = [&] {
     fleet = poller.snapshot();
-    if (project) model = tui::load_model(*project);
+    if (!remote_host.empty()) {
+      if (fleet.has_board && fleet.board_host == remote_host && fleet.board_root == remote_root) model = fleet.board;
+    } else if (project) {
+      model = tui::load_model(*project);
+    }
     tui::clamp_selection(model, view);
     if (tab == 1) activity = load_activity(local_roots(), 500);
     int rows = static_cast<int>(tui::side_rows(fleet).size());
@@ -95,17 +101,29 @@ int cmd_ui(const Args&) {
     if (side || items.empty()) return nullptr;
     return &items[static_cast<size_t>(view.index)];
   };
-  auto session_live_here = [&](const std::string& id) {
+  auto session_live = [&](const std::string& host, const std::string& id) {
     for (const auto& g : fleet.projects)
-      if (g.machine.empty())
+      if (g.machine == host)
         for (const auto& s : g.sessions)
           if (std::to_string(s.id) == id) return s.state != tui::SessionState::Exited;
     return false;
   };
+  auto machine_called = [&](const std::string& host) {
+    for (const auto& m : fleet.machines)
+      if ((host.empty() && m.here) || (!host.empty() && m.name == host)) return m.machine_name;
+    return std::string();
+  };
   auto buttons_for = [&](const tui::Item* it) {
     std::vector<Button> b;
     if (!it) return b;
-    bool live = !it->session.empty() && it->machine == machine_name() && session_live_here(it->session);
+    bool live = !it->session.empty() && it->machine == machine_called(remote_host) &&
+                session_live(remote_host, it->session);
+    if (!remote_host.empty()) {
+      // A project on another machine: its terminal is reachable; its files are not here.
+      if (live) b.push_back({it->state == RunState::Waiting ? Action::Answer : Action::Terminal, "enter",
+                             it->state == RunState::Waiting ? tr("Answer") : tr("Terminal")});
+      return b;
+    }
     if (it->review) b.push_back({Action::Review, "", tr("Review")});
     if (live) {
       bool answer = it->state == RunState::Waiting;
@@ -129,7 +147,7 @@ int cmd_ui(const Args&) {
     switch (a) {
       case Action::Terminal:
       case Action::Answer:
-        open_terminal("", static_cast<uint32_t>(std::atoi(it.session.c_str())));
+        open_terminal(remote_host, static_cast<uint32_t>(std::atoi(it.session.c_str())));
         break;
       case Action::Review:
         open_run = it.run;
@@ -149,9 +167,13 @@ int cmd_ui(const Args&) {
   };
   auto start_new_session = [&] {
     // Where: the project picked in the sidebar, else the one on the board.
-    new_host.clear();
-    new_cwd = project ? project->root.string() : std::filesystem::current_path().string();
-    new_name = project ? project->root.filename().string() : new_cwd;
+    new_host = remote_host;
+    new_cwd = !remote_host.empty() ? remote_root
+              : project          ? project->root.string()
+                                 : std::filesystem::current_path().string();
+    new_name = !remote_host.empty() ? remote_name + " · " + remote_host
+               : project            ? project->root.filename().string()
+                                    : new_cwd;
     auto rows = tui::side_rows(fleet);
     if (side && side_sel < static_cast<int>(rows.size()) && rows[static_cast<size_t>(side_sel)].kind != tui::SideRow::Kind::Machine) {
       const auto& g = fleet.projects[static_cast<size_t>(rows[static_cast<size_t>(side_sel)].group)];
@@ -179,9 +201,20 @@ int cmd_ui(const Args&) {
       else open_terminal(s.machine, s.id);
       return;
     }
-    if (!g.machine.empty()) {
-      say(tr("for now the board opens projects of this machine"));
+    if (!g.machine.empty() && !g.root.empty()) {
+      remote_host = g.machine;
+      remote_root = g.root;
+      remote_name = g.name;
+      poller.watch(remote_host, remote_root);
+      model = {};
+      view = {};
+      side = false;
+      overlay = Overlay::None;
+    } else if (!g.machine.empty()) {
+      say(tr("this folder has no .apron/ yet"));
     } else if (has_project(g.root)) {
+      remote_host.clear();
+      poller.watch("", "");
       project = Project{g.root};
       model = tui::load_model(*project);
       view = {};
@@ -229,7 +262,9 @@ int cmd_ui(const Args&) {
     if (SW == 0) side = false;
     if (SW) tui::render_sidebar(screen, {0, 0, SW, H - 1}, fleet, side_sel, side, now, hits);
     tui::Rect main_r{SW, 0, W - SW, H - 1};
-    std::string title = project ? project->root.filename().string() : tr("no project here");
+    std::string title = !remote_host.empty() ? remote_name + " · " + remote_host
+                        : project            ? project->root.filename().string()
+                                             : tr("no project here");
     if (overlay == Overlay::Log || overlay == Overlay::Review) title += " · " + open_run;
     if (overlay == Overlay::Task) title += " · " + open_task;
     tui::Rect in = tui::render_main_frame(screen, main_r, title, {tr("Progress"), tr("Activity")}, tab, !side, hits);
@@ -245,7 +280,7 @@ int cmd_ui(const Args&) {
     else if (tab == 1) tui::render_activity(sub, activity, activity_scroll, now);
     else drew_sub = false;
     if (drew_sub) screen.blit(sub, in.x, in.y);
-    else if (project) tui::render_board(screen, in, model, view, !side, buttons, now, hits);
+    else if (project || !remote_host.empty()) tui::render_board(screen, in, model, view, !side, buttons, now, hits);
     else screen.put(in.x, in.y + 1, tr("No project in this folder. Pick one in the sidebar."), {});
 
     if (overlay == Overlay::Help) tui::render_help(screen, main_r);

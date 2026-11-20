@@ -35,6 +35,7 @@ struct ProjectGroup {
 
 struct MachineRow {
   std::string name;
+  std::string machine_name;  // what the machine calls itself (in runs: agent@machine)
   bool here = false;
   bool ok = false;
   int running = 0;
@@ -45,6 +46,10 @@ struct MachineRow {
 struct Fleet {
   std::vector<ProjectGroup> projects;
   std::vector<MachineRow> machines;
+  // The board of the project being watched on another machine, when there is one.
+  bool has_board = false;
+  std::string board_host, board_root;
+  Model board;
 };
 
 // The selectable rows of the sidebar, top to bottom.

@@ -13,6 +13,8 @@
 
 #include "proto/frame.hpp"
 #include "proto/socket.hpp"
+#include "core/board.hpp"
+#include "core/json.hpp"
 #include "core/scope.hpp"
 #include "test.hpp"
 
@@ -128,6 +130,29 @@ TEST("cli: machines over ssh: add, list, ls, attach, unreachable, and events.rec
   close(fd);
   CHECK(got.find("\"project\":\"demo\"") != std::string::npos);
   CHECK(got.find("over there") != std::string::npos);
+
+  // project.board: the board of a project the daemon knows, for a screen elsewhere.
+  fd = apron::proto::connect_unix(dir / "box.sock");
+  std::string req = R"({"id":2,"cmd":"project.board","root":")" + fs::canonical(dir / "demo").string() + R"("})";
+  apron::proto::write_all(fd, apron::proto::encode({apron::proto::Type::Ctrl, 0, req}));
+  apron::proto::Reader reader2;
+  std::string board;
+  for (int i = 0; i < 50 && board.empty(); ++i) {
+    ssize_t n = read(fd, buf, sizeof buf);
+    if (n <= 0) break;
+    reader2.feed(std::string_view(buf, static_cast<size_t>(n)));
+    if (auto f = reader2.next()) board = f->payload;
+  }
+  close(fd);
+  CHECK(board.find("\"board\"") != std::string::npos);
+  CHECK(board.find("D1") != std::string::npos);
+  auto parsed = apron::json::parse(board);
+  CHECK(parsed && parsed->find("board"));
+  if (parsed && parsed->find("board")) {
+    apron::Model m = apron::board_from_json(*parsed->find("board"));
+    CHECK_EQ(m.lanes[1].size(), size_t(1));  // D1 is running over there
+    CHECK_EQ(apron::json::dump(apron::board_to_json(m)), apron::json::dump(*parsed->find("board")));
+  }
 
   sh(box + apron + " daemon stop");
   fs::remove_all(dir);

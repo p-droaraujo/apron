@@ -143,7 +143,6 @@ const std::unordered_map<std::string_view, std::string_view>& pt_br() {
       {"discarded; the task is open again", "descartada; a tarefa está aberta de novo"},
       {"end session", "encerrar sessão"},
       {"ended", "encerrada"},
-      {"for now the board opens projects of this machine", "por enquanto o quadro abre projetos desta máquina"},
       {"keys", "teclas"},
       {"log", "log"},
       {"merge", "mesclar"},

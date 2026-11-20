@@ -90,10 +90,10 @@ See every agent on one screen and reach the right terminal in one keystroke.
   done-when: the sidebar lists every machine's sessions by project and Enter attaches to one, local or over ssh; the board draws boxed cards with buttons that work by key and by mouse; Tab, Shift-Tab and Esc behave the same on every screen; the Review tab is gone and reviewing happens from a Gates card; no uppercase eyebrow labels, duplicated status or em dashes in the interface and docs
   checks: build, test
 
-- [ ] T10 Progress view across machines, from the daemon's events
-  scope: src/tui/**, tests/**
-  depends: T7, T9, T11
-  done-when: the progress view shows the runs of every project and machine with the agent states
+- [x] T10 The board of a project on another machine: choosing it in the sidebar shows its board, built over there and sent through ssh, with its agents' terminals one key away
+  scope: src/tui/**, src/cli/**, src/core/**, src/daemon/server.cpp, tests/**, CMakeLists.txt
+  depends: T8, T20
+  done-when: aprond answers project.board for the projects it knows; choosing a project of another machine in the sidebar shows its lanes and Enter on a card with a live session opens that terminal over ssh
   checks: build, test
 
 - [ ] T22 Cut the commands: a person needs `apron` and `apron new`; agents use `run`, `report` and `check`; `hook`, `proxy` and `daemon` leave the help; the rest goes once the screen covers it

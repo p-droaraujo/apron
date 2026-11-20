@@ -5,6 +5,7 @@
 #include "cli/common.hpp"
 #include "core/checks.hpp"
 #include "core/events.hpp"
+#include "core/scope.hpp"
 #include "core/tasks.hpp"
 #include "core/time.hpp"
 
@@ -56,6 +57,21 @@ int cmd_check(const Args& args) {
     if (!known) std::fprintf(stderr, "%s\n", trf("warning: no check named {} in checks.toml", {w}).c_str());
   }
 
+  // The run's context, for checks that judge the run itself (a verifier).
+  Env env;
+  if (current && !run_events.empty()) {
+    const Event& start = run_events.front();
+    env.emplace_back("APRON_RUN", *current);
+    env.emplace_back("APRON_TASK", start.task);
+    if (std::string base = start.extra_str("base"); is_commit_id(base)) env.emplace_back("APRON_BASE", base);
+    if (auto file = TaskFile::load(project->tasks_file()))
+      if (const Task* t = file->find(start.task)) {
+        std::string text = t->id + " " + t->title;
+        for (const auto& [k, v] : t->fields) text += "\n" + k + ": " + v;
+        env.emplace_back("APRON_TASK_TEXT", text);
+      }
+  }
+
   Style st;
   int failed = 0;
   for (const auto& c : selected) {
@@ -64,7 +80,7 @@ int cmd_check(const Args& args) {
       std::printf("%s %s", st.dim("…").c_str(), c.name.c_str());
       std::fflush(stdout);
     }
-    CheckResult r = run_check(c, project->root);
+    CheckResult r = run_check(c, project->root, env);
     std::string when = timeutil::short_duration(r.ms);
     std::string mark = r.ok ? "✓" : st.red("✕");
     std::string why = r.timed_out ? " " + st.red(trf("timed out after {}s", {std::to_string(c.timeout_s)})) : "";

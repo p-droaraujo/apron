@@ -13,6 +13,7 @@
 
 #include "proto/frame.hpp"
 #include "proto/socket.hpp"
+#include "core/scope.hpp"
 #include "test.hpp"
 
 namespace fs = std::filesystem;
@@ -129,5 +130,76 @@ TEST("cli: machines over ssh: add, list, ls, attach, unreachable, and events.rec
   CHECK(got.find("over there") != std::string::npos);
 
   sh(box + apron + " daemon stop");
+  fs::remove_all(dir);
+}
+
+TEST("cli: checks get the run's context, and apron-verify follows the agent's verdict") {
+  fs::path dir = fs::temp_directory_path() / ("apron-verify-" + std::to_string(::getpid()));
+  fs::remove_all(dir);
+  fs::create_directories(dir / ".apron");
+  std::string verify = std::string(APRON_SOURCE_DIR) + "/integrations/verify/apron-verify.sh";
+  std::ofstream(dir / ".apron" / "tasks.md") << "- [ ] V1 Greet\n  scope: **\n  done-when: hello.txt says hello\n";
+  std::ofstream(dir / ".apron" / "checks.toml")
+      << "[[check]]\nname = \"env\"\nrun = \"test -n \\\"$APRON_BASE\\\" && echo \\\"$APRON_TASK_TEXT\\\" | grep -q done-when\"\n"
+      << "[[check]]\nname = \"verify\"\nrun = \"" << verify << "\"\n"
+      << "[[check]]\nname = \"security\"\nrun = \"" << verify << " security\"\n";
+  std::string apron = std::string(APRON_BINARY_DIR) + "/apron";
+  std::string in = "cd " + dir.string() + " && NO_COLOR=1 APRON_LANG=en APRON_SOCKET=" + (dir / "none.sock").string() +
+                   " APRON_AGENT=claude APRON_MACHINE=box ";
+  sh(in + "git init -q && git -c user.email=t@t -c user.name=t commit -q --allow-empty -m base");
+  sh(in + apron + " run start V1");
+  std::ofstream(dir / "hello.txt") << "hello\n";
+  std::string prompt = (dir / "prompt.txt").string();
+  auto agent = [&](const std::string& answer) {
+    return "APRON_VERIFY_AGENT=\"tee " + prompt + " >/dev/null; echo looks right; echo '" + answer + "'\" ";
+  };
+
+  std::string pass = sh(in + agent("VERDICT: PASS") + apron + " check env verify; echo rc=$?");
+  CHECK(pass.find("✓ env") != std::string::npos);
+  CHECK(pass.find("✓ verify") != std::string::npos);
+  CHECK(pass.find("rc=0") != std::string::npos);
+  std::ifstream p(prompt);
+  std::string text((std::istreambuf_iterator<char>(p)), {});
+  CHECK(text.find("done-when: hello.txt says hello") != std::string::npos);  // the task
+  CHECK(text.find("hello.txt") != std::string::npos);                        // the new file
+  CHECK(text.find("did not see how") != std::string::npos);
+
+  CHECK(sh(in + agent("VERDICT: FAIL") + apron + " check verify; echo rc=$?").find("rc=1") != std::string::npos);
+  CHECK(sh(in + agent("maybe?") + apron + " check verify").find("no VERDICT line") != std::string::npos);
+  sh(in + agent("VERDICT: PASS") + apron + " check security");
+  std::ifstream p2(prompt);
+  std::string text2((std::istreambuf_iterator<char>(p2)), {});
+  CHECK(text2.find("Review only security") != std::string::npos);
+  fs::remove_all(dir);
+}
+
+TEST("cli: run start warns when its scope meets a run in progress") {
+  using apron::globs_may_overlap;
+  CHECK(globs_may_overlap("src/**", "src/cli/**"));
+  CHECK(globs_may_overlap("src/cli/main.cpp", "src/**"));
+  CHECK(globs_may_overlap("**", "docs/**"));
+  CHECK(!globs_may_overlap("docs/**", "src/**"));
+  CHECK(!globs_may_overlap("README.md", "src/**"));
+  CHECK(!globs_may_overlap("web/**", "api/**"));
+
+  fs::path dir = fs::temp_directory_path() / ("apron-lanes-" + std::to_string(::getpid()));
+  fs::remove_all(dir);
+  fs::create_directories(dir / ".apron");
+  std::ofstream(dir / ".apron" / "tasks.md") << "- [ ] W1 Web\n  scope: web/**\n  done-when: x\n"
+                                             << "- [ ] A1 Api\n  scope: api/**\n  done-when: x\n"
+                                             << "- [ ] B1 Both\n  scope: api/auth/**, README.md\n  done-when: x\n";
+  std::string apron = std::string(APRON_BINARY_DIR) + "/apron";
+  std::string in = "cd " + dir.string() + " && NO_COLOR=1 APRON_LANG=en APRON_SOCKET=" + (dir / "none.sock").string() +
+                   " APRON_AGENT=claude APRON_MACHINE=box ";
+  sh(in + "git init -q");
+  // Each run in its own worktree in real life; here one after another, clearing "current".
+  CHECK(sh(in + apron + " run start W1 2>&1").find("warning") == std::string::npos);
+  fs::remove(dir / ".apron" / "runs" / "current");
+  CHECK(sh(in + apron + " run start A1 2>&1").find("warning") == std::string::npos);  // web and api: clean lanes
+  fs::remove(dir / ".apron" / "runs" / "current");
+  std::string both = sh(in + apron + " run start B1 2>&1");
+  CHECK(both.find("scope meets A1") != std::string::npos);
+  CHECK(both.find("scope meets W1") == std::string::npos);
+  CHECK(sh(in + apron + " log").find("scope meets A1") != std::string::npos);  // recorded in the run
   fs::remove_all(dir);
 }

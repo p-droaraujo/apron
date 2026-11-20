@@ -118,7 +118,7 @@ std::optional<std::vector<Check>> load_checks(const std::filesystem::path& file,
   return parse_checks(ss.str(), error);
 }
 
-CheckResult run_check(const Check& check, const std::filesystem::path& root) {
+CheckResult run_check(const Check& check, const std::filesystem::path& root, const Env& env) {
   CheckResult r;
   r.name = check.name;
   int64_t start = timeutil::now_ms();
@@ -133,10 +133,13 @@ CheckResult run_check(const Check& check, const std::filesystem::path& root) {
   }
   if (pid == 0) {
     setpgid(0, 0);  // own process group, so a timeout can stop the whole tree
+    int null = open("/dev/null", O_RDONLY);  // a check never reads the person's terminal
+    dup2(null, STDIN_FILENO);
     dup2(pipefd[1], STDOUT_FILENO);
     dup2(pipefd[1], STDERR_FILENO);
     close(pipefd[0]);
     close(pipefd[1]);
+    for (const auto& [k, v] : env) setenv(k.c_str(), v.c_str(), 1);
     if (chdir(root.c_str()) != 0) _exit(127);
     execl("/bin/sh", "sh", "-c", check.run.c_str(), static_cast<char*>(nullptr));
     _exit(127);

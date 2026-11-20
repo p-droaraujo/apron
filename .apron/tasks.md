@@ -108,3 +108,9 @@ Apron's own plan, in the format described in `docs/agent-protocol.md`.
   scope: src/**, tests/**, CMakeLists.txt, README.md
   done-when: sanitizers (ASan, UBSan, leaks) stay clean on every test; a stalled client cannot freeze aprond; no value read from .apron/ reaches a shell; the board reloads 300 runs without re-reading unchanged files
   checks: build, test
+
+- [x] T18 Builder + verifier and lanes: a `verify` check where a fresh read-only agent judges the diff against the task, the same with a focus for a reviewer team, and a warning when running tasks' scopes overlap
+  scope: src/**, tests/**, integrations/**, docs/**, AGENTS.md, README.md, .apron/checks.toml
+  depends: T3, T4
+  done-when: checks get APRON_RUN, APRON_TASK, APRON_TASK_TEXT and APRON_BASE; `integrations/verify/apron-verify.sh [focus]` passes or fails on the agent's verdict, with any agent command; `apron run start` warns and records a note when its scope overlaps a run still in progress
+  checks: build, test

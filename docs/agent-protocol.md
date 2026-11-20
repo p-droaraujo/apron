@@ -79,6 +79,16 @@ Every command writes one event and returns in under 10 ms. None of them blocks t
 
 The file in `.apron/runs/` is always the source. If the machine's `aprond` is running, the CLI also tells it about the event, without waiting for an answer; that is how the daemon knows every project on the machine (`apron projects`). With the daemon down, nothing is lost.
 
+### Parallel runs: lanes
+
+Runs can work at the same time when their scopes do not meet: `web/**`, `api/**` and `docs/**` are clean lanes. When a run starts and its scope meets the scope of a run still in progress, `apron run start` warns and records the overlap as a note in the new run. The comparison is by the globs' literal prefixes, so it may warn for globs that never touch (`src/*.cpp` and `src/*.hpp`), but it never misses two that do. On a warning, an agent asks before going on. Step-by-step work and small fixes stay in one run.
+
+### Builder and verifier
+
+A check runs with the run's context in its environment: `APRON_RUN`, `APRON_TASK`, `APRON_TASK_TEXT` (the task line and its fields) and `APRON_BASE` (the commit the run started from). That is enough for a check that judges the run itself.
+
+`integrations/verify/apron-verify.sh` is such a check: a fresh agent, with no memory of how the work was done and no tools that write, reads the task and the diff and ends with `VERDICT: PASS` or `VERDICT: FAIL`. With a focus (`ux`, `simplicity`, `edge-cases`, `security`) it is one reviewer of a team; run several to have the team. Any agent works: `APRON_VERIFY_AGENT` is the command, and it reads the prompt on stdin.
+
 A run started inside an `apron` session records the session (`session` in `run.started`), so the run and the agent's terminal can be found from each other.
 
 ## 4. Events

@@ -134,6 +134,16 @@ std::optional<std::string> capture(const std::vector<std::string>& argv, const s
   return text;
 }
 
+bool globs_may_overlap(std::string_view a, std::string_view b) {
+  auto literal = [](std::string_view g) { return g.substr(0, std::min(g.size(), g.find_first_of("*?["))); };
+  std::string_view la = literal(a), lb = literal(b);
+  bool wa = la.size() < a.size(), wb = lb.size() < b.size();
+  if (!wa && !wb) return a == b;
+  if (!wa) return glob_match(b, a);
+  if (!wb) return glob_match(a, b);
+  return la.substr(0, std::min(la.size(), lb.size())) == lb.substr(0, std::min(la.size(), lb.size()));
+}
+
 bool is_commit_id(std::string_view s) {
   if (s.size() < 4 || s.size() > 64) return false;
   for (char c : s)

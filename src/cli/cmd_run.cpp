@@ -12,6 +12,40 @@ namespace apron::cli {
 
 namespace {
 
+// Lanes: parallel runs are safe when their scopes do not meet. When this run's
+// scope meets one still in progress, say so, on the terminal and in the run.
+void warn_overlaps(const Project& project, const TaskFile& file, const Task& task, const Event& started) {
+  auto mine = split_scope(task.field(kScope));
+  for (const auto& r : list_runs(project)) {
+    if (r.id == started.run || r.state == RunState::Done || r.state == RunState::Failed || r.state == RunState::Abandoned)
+      continue;
+    const Task* other = file.find(r.task);
+    if (!other || other->id == task.id) continue;
+    std::vector<std::string> shared;
+    for (const auto& theirs : split_scope(other->field(kScope)))
+      for (const auto& g : mine)
+        if (globs_may_overlap(g, theirs)) {
+          shared.push_back(theirs);
+          break;
+        }
+    if (shared.empty()) continue;
+    std::string list;
+    for (const auto& g : shared) list += (list.empty() ? "" : ", ") + g;
+    std::string msg = trf("scope meets {} ({}, {}@{}): {}", {r.task, r.id, r.agent, r.machine, list});
+    std::fprintf(stderr, "%s\n", trf("warning: {}", {msg}).c_str());
+    Event n;
+    n.ts_ms = timeutil::now_ms();
+    n.run = started.run;
+    n.task = started.task;
+    n.agent = started.agent;
+    n.machine = started.machine;
+    n.kind = Kind::Note;
+    n.msg = msg;
+    std::string err;
+    record(project, n, &err);
+  }
+}
+
 int run_start(const Args& args, const Project& project) {
   if (args.pos.size() < 2) return fail(tr("usage: apron run start <task> [--agent name] [--intent \"sentence\"]"));
   if (auto current = project.current_run()) {
@@ -53,6 +87,7 @@ int run_start(const Args& args, const Project& project) {
   project.set_current_run(e.run);
   if (task) sync_task(project, id, '~', e.agent + "@" + e.machine);
   std::printf("%s\n", e.run.c_str());
+  if (task && file) warn_overlaps(project, *file, *task, e);
   return 0;
 }
 

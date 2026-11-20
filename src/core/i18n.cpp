@@ -131,6 +131,7 @@ const std::unordered_map<std::string_view, std::string_view>& pt_br() {
       {"usage: apron machines add <ssh host> [apron command there]", "uso: apron machines add <host ssh> [comando do apron lá]"},
       {"usage: apron machines rm <ssh host>", "uso: apron machines rm <host ssh>"},
       {"no machine {}", "nenhuma máquina {}"},
+      {"scope meets {} ({}, {}@{}): {}", "o escopo encontra {} ({}, {}@{}): {}"},
       {"not a host: {}", "não é um host: {}"},
       {"not a run id: {}", "não é um id de execução: {}"},
       {"could not write {}", "não foi possível gravar {}"},

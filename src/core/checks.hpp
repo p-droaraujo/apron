@@ -5,6 +5,7 @@
 #include <filesystem>
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace apron {
@@ -29,6 +30,9 @@ struct CheckResult {
   std::string tail;  // last lines of output, kept when it fails
 };
 
-CheckResult run_check(const Check& check, const std::filesystem::path& root);
+// `env` is added to the check's environment: the run's context (APRON_RUN,
+// APRON_TASK, APRON_TASK_TEXT, APRON_BASE), so a check can judge the run itself.
+using Env = std::vector<std::pair<std::string, std::string>>;
+CheckResult run_check(const Check& check, const std::filesystem::path& root, const Env& env = {});
 
 }  // namespace apron

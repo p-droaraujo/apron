@@ -1,8 +1,38 @@
 # Each check is a command; exit code 0 means it passed.
+# A check runs with the run's context in its environment: APRON_RUN,
+# APRON_TASK, APRON_TASK_TEXT and APRON_BASE.
 [[check]]
 name = "build"
-run  = "cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug >/dev/null && cmake --build build"
+run  = "cmake -S . -B build -G Ninja >/dev/null && cmake --build build"
 
 [[check]]
 name = "test"
 run  = "ctest --test-dir build --output-on-failure"
+
+# Builder + verifier: a fresh read-only agent judges the diff against the task.
+[[check]]
+name = "verify"
+run  = "integrations/verify/apron-verify.sh"
+timeout = 900
+
+# The reviewer team: run them together before a merge with
+#   apron check review-ux review-simplicity review-edge-cases review-security
+[[check]]
+name = "review-ux"
+run  = "integrations/verify/apron-verify.sh ux"
+timeout = 900
+
+[[check]]
+name = "review-simplicity"
+run  = "integrations/verify/apron-verify.sh simplicity"
+timeout = 900
+
+[[check]]
+name = "review-edge-cases"
+run  = "integrations/verify/apron-verify.sh edge-cases"
+timeout = 900
+
+[[check]]
+name = "review-security"
+run  = "integrations/verify/apron-verify.sh security"
+timeout = 900

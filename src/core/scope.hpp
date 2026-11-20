@@ -16,6 +16,11 @@ bool glob_match(std::string_view pattern, std::string_view path);
 // "src/**, tests/**" -> {"src/**", "tests/**"}
 std::vector<std::string> split_scope(const std::string& scope);
 
+// Whether some path could match both globs. Two globs are compared by their
+// literal prefixes (the text before the first * ? [), so it may say yes for
+// globs that never meet (src/*.cpp and src/*.hpp), never no for ones that do.
+bool globs_may_overlap(std::string_view a, std::string_view b);
+
 struct ScopeReport {
   std::vector<std::string> files;    // touched, relative to the repo root
   std::vector<std::string> outside;  // touched and outside the scope

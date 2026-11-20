@@ -42,6 +42,26 @@ T2 · claude@nexus · 12m04s · ✓ feita
   12m04s  ■ terminou     done · parser and writer done; review the state markers first
 ```
 
+## Builder, verifier and lanes
+
+A check can call an agent. `integrations/verify/apron-verify.sh` gives a fresh agent, which cannot write, the task and the diff of the run, and passes or fails on its verdict. A focus makes it one reviewer of a team:
+
+```toml
+[[check]]
+name = "verify"
+run  = "integrations/verify/apron-verify.sh"            # or: ... security, ux, simplicity, edge-cases
+timeout = 900
+```
+
+```sh
+apron check verify                                                   # after the work, before finish
+apron check review-ux review-simplicity review-edge-cases review-security   # the team, before a merge
+```
+
+The default agent is `claude -p` without its writing tools; set `APRON_VERIFY_AGENT` for another (it reads the prompt on stdin). Checks get `APRON_RUN`, `APRON_TASK`, `APRON_TASK_TEXT` and `APRON_BASE`, so your own checks can judge a run too.
+
+Lanes: `apron run start` warns, and notes it in the run, when the task's scope meets the scope of a run still in progress. Parallel runs are for work that divides cleanly by folder.
+
 ## Review
 
 Finished runs wait in Gates until you review them. `v` opens the Review tab: failing checks and scope drift first; Enter shows the trajectory, the checks, the scope and the changed files; `m` merges into `main`, `r` returns the run with a comment the next agent reads, `d` discards it. `apron review` does the same from the shell.

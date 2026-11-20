@@ -114,6 +114,12 @@ See every agent on one screen and reach the right terminal in one keystroke.
   done-when: a third view shows one tile per live session of every machine, updating as they write, and Enter or a click opens the tile in Focus
   checks: build, test
 
+- [x] T35 Every action is a visible element: arrows move the focus, Enter acts; one way to show focus; empty places hold a button, not a sentence
+  scope: src/tui/**, src/cli/cmd_ui.cpp, src/core/i18n.cpp, tests/**
+  depends: T34
+  done-when: no letter key does an action (navigation, Enter, Esc, Tab, q and Ctrl-] remain); focus is shown by the accent color of an outline, a bar or a bracket, never a background; the focus never vanishes; Running and Agents always hold a New agent placeholder; sessions, machines and cards carry their actions as buttons; Activity drops the project when it is the only one and has a legend
+  checks: build, test
+
 - [x] T34 Build with the Zig that Homebrew ships: libghostty-vt pinned to its release vt-1.0.1 (Zig 0.17), vt.cpp on the 1.0 C API
   scope: src/tui/vt.cpp, CMakeLists.txt, README.md, CONTRIBUTING.md, AGENTS.md
   depends: T33

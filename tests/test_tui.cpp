@@ -99,16 +99,47 @@ TEST("progress: tasks and runs land in the right lanes") {
   View v;
   std::vector<Hit> hits;
   i18n::set(i18n::Lang::En);
-  render_board(s, {0, 0, 120, 20}, m, v, true, {}, timeutil::now_ms(), hits);
+  render_board(s, {0, 0, 120, 20}, m, v, Target{Act::Card, 2, 0}, {}, timeutil::now_ms(), hits);
   CHECK(screen_has(s, "Gates 1"));
   i18n::set(i18n::Lang::PtBr);
   s.clear();
-  render_board(s, {0, 0, 120, 20}, m, v, true, {}, timeutil::now_ms(), hits);
+  render_board(s, {0, 0, 120, 20}, m, v, Target{Act::Card, 2, 0}, {}, timeutil::now_ms(), hits);
   CHECK(screen_has(s, "Portões 1"));
   i18n::set(i18n::Lang::En);
   CHECK(screen_has(s, "o schema pode mudar?"));
   CHECK(!hits.empty());  // every card can be clicked
+  CHECK(screen_has(s, "+ Novo agente"));  // Running always has a place to start one
+  // Focus shows as color, never as a background.
+  for (int y = 0; y < s.height(); ++y)
+    for (int x = 0; x < s.width(); ++x) CHECK(!s.at(x, y).style.bg.set);
   fs::remove_all(root);
+}
+
+TEST("focus: the arrows move to the nearest element in that direction") {
+  std::vector<Hit> hits = {
+      {0, 0, 10, 1, {Act::Project, 0, 0}},  {0, 1, 10, 1, {Act::Session, 0, 0}},
+      {20, 0, 10, 3, {Act::Card, 1, 0}},    {20, 3, 10, 3, {Act::Card, 1, 1}},
+      {40, 0, 10, 3, {Act::Card, 2, 0}},    {60, 0, 6, 1, {Act::Tab, 0, 0}, false},
+  };
+  auto go = [&](Target from, Dir d) {
+    const Hit* h = next_hit(hits, from, d);
+    return h ? h->t : Target{};
+  };
+  CHECK(go({Act::Card, 1, 0}, Dir::Down) == (Target{Act::Card, 1, 1}));
+  CHECK(go({Act::Card, 1, 0}, Dir::Right) == (Target{Act::Card, 2, 0}));
+  CHECK(go({Act::Card, 1, 0}, Dir::Left).act == Act::Session);  // level with the card
+  CHECK(go({Act::Card, 2, 0}, Dir::Right).act == Act::None);  // tabs take no focus
+  CHECK(go({Act::Project, 0, 0}, Dir::Down) == (Target{Act::Session, 0, 0}));
+}
+
+TEST("grid: with no agents there is a place to start one") {
+  Screen s;
+  s.resize(100, 20);
+  std::vector<Hit> hits;
+  i18n::set(i18n::Lang::En);
+  render_grid(s, {0, 0, 100, 20}, {}, Target{Act::NewAgent, 1, 0}, hits);
+  CHECK(screen_has(s, "+ New agent"));
+  CHECK(find_hit(hits, Target{Act::NewAgent, 1, 0}) != nullptr);
 }
 
 TEST("activity: events of several projects, newest first") {

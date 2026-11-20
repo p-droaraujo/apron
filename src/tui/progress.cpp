@@ -148,12 +148,25 @@ void render_review(Screen& sc, const Project& project, const RunSummary& r, cons
 
 }
 
-void render_activity(Screen& sc, const std::vector<ActivityItem>& items, int scroll, int64_t now) {
+void render_activity(Screen& sc, const std::vector<ActivityItem>& items, int scroll, int64_t now,
+                     const std::string& here) {
   sc.clear();
   int W = sc.width(), H = sc.height();
   if (items.empty()) sc.put(1, 0, tr("no activity yet"), kDim);
+  // The bottom line explains the glyphs.
+  const std::pair<const char*, const char*> legend[] = {
+      {"▶", "started"}, {"·", "step"}, {"◐", "asks"}, {"⊘", "blocked"}, {"›", "note"},
+      {"✓", "check passed"}, {"✕", "check failed"}, {"■", "finished"}, {"↩", "returned"},
+  };
+  int lx = 1;
+  for (const auto& [g, what] : legend) {
+    std::string label = tr(what);
+    if (lx + 2 + text_width(label) > W) break;
+    lx += sc.put(lx, H - 1, g, kSoft) + 1;
+    lx += sc.put(lx, H - 1, label, kDim) + 3;
+  }
   int y = 0;
-  for (size_t i = static_cast<size_t>(std::max(0, scroll)); i < items.size() && y < H - 1; ++i, ++y) {
+  for (size_t i = static_cast<size_t>(std::max(0, scroll)); i < items.size() && y < H - 2; ++i, ++y) {
     const Event& e = items[i].event;
     std::string g = "·", msg = e.msg;
     Style gs = kBlue, ms = kSoft;
@@ -183,8 +196,9 @@ void render_activity(Screen& sc, const std::vector<ActivityItem>& items, int scr
     std::string when = ago(now, e.ts_ms);
     sc.put(1, y, when, kDim);
     sc.put(8, y, g, gs);
-    int x = 10 + sc.put(10, y, fit(items[i].project, 14), kSoft);
-    x = std::max(x + 1, 25);
+    int x = 10;
+    // The project is named only when it is not the one in the pane's title.
+    if (items[i].project != here) x += 1 + sc.put(x, y, fit(items[i].project, 14), kSoft);
     x += 1 + sc.put(x, y, e.task, kBold);
     x += 1 + sc.put(x, y, fit(e.agent + "@" + e.machine, 18), kDim);
     sc.put(x, y, fit(msg, W - x - 1), ms);

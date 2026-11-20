@@ -1,9 +1,10 @@
 // apron (no arguments): the screen. A sidebar with projects, sessions and
 // machines; the board or the activity of a project; details over the board.
 //
-// The same keys everywhere: Tab and Shift-Tab change the view, the arrows
-// move, Enter opens, Esc goes back one level, q quits. The mouse clicks what
-// it points at. The footer lists the keys that work on the current screen.
+// Everything a person can do is an element on the screen: the arrows move
+// the focus to it, Enter does it, the mouse clicks it. The only other keys
+// are Tab and Shift-Tab for the views, Esc to go back, q to quit and Ctrl-]
+// to leave an agent's terminal. The footer says what Enter does now.
 #include <unistd.h>
 
 #include <algorithm>
@@ -96,9 +97,9 @@ int cmd_ui(const Args&) {
   int tab = kBoard;
   std::map<std::string, std::unique_ptr<DaemonClient>> grid_clients;  // one connection per machine
   std::vector<Watched> grid;
-  int grid_sel = 0;
-  bool side = false;
-  int side_sel = 0;
+  // The element with the focus. Act::None: the main pane itself, when it
+  // shows something to read rather than to act on (Activity, a log).
+  tui::Target cur{tui::Act::Card, 1, 0};
   std::vector<ActivityItem> activity;
   int activity_scroll = 0, scroll = 0;
   std::string open_run, open_task, stat, input, status;
@@ -108,7 +109,6 @@ int cmd_ui(const Args&) {
   uint32_t kill_id = 0;
   int64_t last_load = 0, status_until = 0;
   std::vector<tui::Hit> hits;
-  tui::Rect in_last;
 
   auto say = [&](const std::string& s) {
     status = s;
@@ -131,12 +131,10 @@ int cmd_ui(const Args&) {
     }
     tui::clamp_selection(model, view);
     if (tab == kActivity) activity = load_activity(local_roots(), 500);
-    int rows = static_cast<int>(tui::side_rows(fleet).size());
-    side_sel = std::clamp(side_sel, 0, std::max(0, rows - 1));
   };
   auto selected_item = [&]() -> const tui::Item* {
     const auto& items = model.lanes[view.lane];
-    if (side || items.empty()) return nullptr;
+    if (items.empty() || view.index >= static_cast<int>(items.size())) return nullptr;
     return &items[static_cast<size_t>(view.index)];
   };
   auto session_live = [&](const std::string& host, const std::string& id) {
@@ -158,17 +156,17 @@ int cmd_ui(const Args&) {
                 session_live(remote_host, it->session);
     if (!remote_host.empty()) {
       // A project on another machine: its terminal is reachable; its files are not here.
-      if (live) b.push_back({it->state == RunState::Waiting ? Action::Answer : Action::Terminal, "t",
+      if (live) b.push_back({it->state == RunState::Waiting ? Action::Answer : Action::Terminal,
                              it->state == RunState::Waiting ? tr("Answer") : tr("Terminal")});
       return b;
     }
-    if (it->review) b.push_back({Action::Review, "r", tr("Review")});
+    if (it->review) b.push_back({Action::Review, tr("Review")});
     if (live) {
       bool answer = it->state == RunState::Waiting;
-      b.push_back({answer ? Action::Answer : Action::Terminal, "t", answer ? tr("Answer") : tr("Terminal")});
+      b.push_back({answer ? Action::Answer : Action::Terminal, answer ? tr("Answer") : tr("Terminal")});
     }
-    if (!it->run.empty()) b.push_back({Action::Log, "o", tr("Log")});
-    else b.push_back({Action::Details, "d", tr("Details")});
+    if (!it->run.empty()) b.push_back({Action::Log, tr("Log")});
+    else b.push_back({Action::Details, tr("Details")});
     return b;
   };
   // The agent's terminal in the main pane, with the sidebar still in view.
@@ -232,33 +230,56 @@ int cmd_ui(const Args&) {
     }
     focus = std::move(f);
     overlay = Overlay::Focus;
-    side = false;
     drain_focus();
   };
-  auto run_action = [&](Action a, const tui::Item& it) {
+  auto run_action = [&](Action a, const tui::Item* it) {
     switch (a) {
       case Action::Terminal:
       case Action::Answer:
-        open_terminal(remote_host, static_cast<uint32_t>(std::atoi(it.session.c_str())));
+        if (it) open_terminal(remote_host, static_cast<uint32_t>(std::atoi(it->session.c_str())));
         break;
       case Action::Review:
-        open_run = it.run;
-        stat = run_changes(*project, it.run).stat;
+        if (!it) break;
+        open_run = it->run;
+        stat = run_changes(*project, it->run).stat;
         overlay = Overlay::Review;
+        cur = {tui::Act::Button, static_cast<int>(Action::Merge), 0};
         break;
       case Action::Log:
-        open_run = it.run;
+        if (it) open_run = it->run;
         scroll = 0;
         overlay = Overlay::Log;
+        cur = {};
         break;
       case Action::Details:
-        open_task = it.task;
+        if (!it) break;
+        open_task = it->task;
+        scroll = 0;
         overlay = Overlay::Task;
+        cur = {};
+        break;
+      case Action::Merge:
+      case Action::Discard: {
+        std::string err = a == Action::Merge ? review_merge(*project, open_run) : review_discard(*project, open_run);
+        if (err.empty()) {
+          say(a == Action::Merge ? tr("merged into main") : tr("discarded; the task is open again"));
+          overlay = Overlay::None;
+          cur = {tui::Act::Card, view.lane, view.index};
+          reload();
+        } else {
+          say(err);
+        }
+        break;
+      }
+      case Action::Return:
+        input.clear();
+        asking = Ask::Return;
+        overlay = Overlay::Prompt;
         break;
     }
   };
+  // A new agent starts in the project on the board.
   auto start_new_session = [&] {
-    // Where: the project picked in the sidebar, else the one on the board.
     new_host = remote_host;
     new_cwd = !remote_host.empty() ? remote_root
               : project          ? project->root.string()
@@ -266,76 +287,52 @@ int cmd_ui(const Args&) {
     new_name = !remote_host.empty() ? remote_name + " · " + remote_host
                : project            ? project->root.filename().string()
                                     : new_cwd;
-    auto rows = tui::side_rows(fleet);
-    if (side && side_sel < static_cast<int>(rows.size()) && rows[static_cast<size_t>(side_sel)].kind != tui::SideRow::Kind::Machine) {
-      const auto& g = fleet.projects[static_cast<size_t>(rows[static_cast<size_t>(side_sel)].group)];
-      new_host = g.machine;
-      new_cwd = !g.root.empty() ? g.root : (!g.sessions.empty() ? g.sessions.front().cwd : new_cwd);
-      new_name = g.name + (g.machine.empty() ? "" : " · " + g.machine);
-    }
     input = "claude";
     asking = Ask::NewSession;
     overlay = Overlay::Prompt;
   };
-  auto activate_side = [&] {
-    auto rows = tui::side_rows(fleet);
-    if (side_sel >= static_cast<int>(rows.size())) return;
-    const auto& row = rows[static_cast<size_t>(side_sel)];
-    if (row.kind == tui::SideRow::Kind::Machine) {
-      const auto& m = fleet.machines[static_cast<size_t>(row.group)];
-      if (!m.error.empty()) say(m.name + ": " + m.error);
-      return;
-    }
-    const auto& g = fleet.projects[static_cast<size_t>(row.group)];
-    if (row.kind == tui::SideRow::Kind::Session) {
-      const auto& s = g.sessions[static_cast<size_t>(row.item)];
-      if (s.state == tui::SessionState::Exited) say(tr("the session has ended"));
-      else open_terminal(s.machine, s.id);
-      return;
-    }
+  auto open_project = [&](int gi) {
+    if (gi >= static_cast<int>(fleet.projects.size())) return;
+    const auto& g = fleet.projects[static_cast<size_t>(gi)];
     if (!g.machine.empty() && !g.root.empty()) {
       remote_host = g.machine;
       remote_root = g.root;
       remote_name = g.name;
       poller.watch(remote_host, remote_root);
       model = {};
-      view = {};
-      side = false;
-      overlay = Overlay::None;
-    } else if (!g.machine.empty()) {
-      say(tr("this folder has no .apron/ yet"));
-    } else if (has_project(g.root)) {
+    } else if (g.machine.empty() && has_project(g.root)) {
       remote_host.clear();
       poller.watch("", "");
       project = Project{g.root};
       model = tui::load_model(*project);
-      view = {};
-      tui::clamp_selection(model, view);
-      side = false;
-      overlay = Overlay::None;
     } else {
       say(tr("this folder has no .apron/ yet"));
-    }
-  };
-  auto ask_kill = [&] {
-    auto rows = tui::side_rows(fleet);
-    if (!side || side_sel >= static_cast<int>(rows.size())) return;
-    const auto& row = rows[static_cast<size_t>(side_sel)];
-    if (row.kind == tui::SideRow::Kind::Machine) {
-      const auto& m = fleet.machines[static_cast<size_t>(row.group)];
-      if (m.here) return;
-      kill_host = m.name;
-      kill_id = 0;  // 0: remove the machine from the list
-      input = trf("Remove {} from the machines?", {m.name});
-      overlay = Overlay::Confirm;
       return;
     }
-    if (row.kind != tui::SideRow::Kind::Session) return;
-    const auto& s = fleet.projects[static_cast<size_t>(row.group)].sessions[static_cast<size_t>(row.item)];
+    view = {};
+    tui::clamp_selection(model, view);
+    overlay = Overlay::None;
+    tab = kBoard;
+    cur = {tui::Act::Card, view.lane, view.index};
+  };
+  auto ask_end_session = [&](int gi, int si) {
+    if (gi >= static_cast<int>(fleet.projects.size())) return;
+    const auto& g = fleet.projects[static_cast<size_t>(gi)];
+    if (si >= static_cast<int>(g.sessions.size())) return;
+    const auto& s = g.sessions[static_cast<size_t>(si)];
     kill_host = s.machine;
     kill_id = s.id;
     input = s.machine.empty() ? trf("End session {} ({})?", {std::to_string(s.id), s.what})
                               : trf("End session {} ({}) on {}?", {std::to_string(s.id), s.what, s.machine});
+    overlay = Overlay::Confirm;
+  };
+  auto ask_remove_machine = [&](int mi) {
+    if (mi >= static_cast<int>(fleet.machines.size())) return;
+    const auto& m = fleet.machines[static_cast<size_t>(mi)];
+    if (m.here) return;
+    kill_host = m.name;
+    kill_id = 0;  // 0: remove the machine from the list
+    input = trf("Remove {} from the machines?", {m.name});
     overlay = Overlay::Confirm;
   };
   // The grid watches every live session without resizing it: one connection
@@ -396,7 +393,6 @@ int cmd_ui(const Args&) {
       if (!client->request(std::move(req), &err)) continue;
       grid.push_back({host, id, title, std::make_unique<tui::Vt>(cols, rows)});
     }
-    grid_sel = std::clamp(grid_sel, 0, std::max(0, static_cast<int>(grid.size()) - 1));
   };
   auto drain_grid = [&] {
     for (auto& [host, client] : grid_clients)
@@ -411,12 +407,46 @@ int cmd_ui(const Args&) {
   };
   auto set_tab = [&](int t) {
     tab = (t + kViews) % kViews;
-    if (tab == kGrid) sync_grid();
     overlay = Overlay::None;
-    if (tab != kGrid) leave_grid();
+    if (tab == kGrid) sync_grid();
+    else leave_grid();
     if (tab == kActivity) {
       activity = load_activity(local_roots(), 500);
       activity_scroll = 0;
+    }
+    cur = tab == kBoard ? tui::Target{tui::Act::Card, view.lane, view.index}
+          : tab == kGrid ? tui::Target{tui::Act::Tile, 0, 0}
+                         : tui::Target{};
+  };
+  auto in_sidebar = [](const tui::Target& t) {
+    using tui::Act;
+    return t.act == Act::Project || t.act == Act::Session || t.act == Act::SessionEnd || t.act == Act::Machine ||
+           t.act == Act::MachineRemove || t.act == Act::AddMachine;
+  };
+  // What Enter does on the element with the focus, for the footer.
+  auto enter_label = [&](const std::vector<Button>& buttons) -> std::string {
+    auto lower = [](std::string l) {
+      if (!l.empty() && l[0] >= 'A' && l[0] <= 'Z') l[0] = static_cast<char>(l[0] - 'A' + 'a');
+      return l;
+    };
+    switch (cur.act) {
+      case tui::Act::Project: return tr("open the project");
+      case tui::Act::Session:
+      case tui::Act::Tile: return tr("open the terminal");
+      case tui::Act::SessionEnd: return tr("end the session");
+      case tui::Act::MachineRemove: return tr("remove the machine");
+      case tui::Act::AddMachine: return tr("add a machine");
+      case tui::Act::NewAgent: return tr("start an agent");
+      case tui::Act::Card: return buttons.empty() ? "" : lower(buttons.front().label);
+      case tui::Act::Button: return lower(tr(cur.a == static_cast<int>(Action::Merge)     ? "Merge"
+                                             : cur.a == static_cast<int>(Action::Return)  ? "Return"
+                                             : cur.a == static_cast<int>(Action::Discard) ? "Discard"
+                                             : cur.a == static_cast<int>(Action::Review)  ? "Review"
+                                             : cur.a == static_cast<int>(Action::Log)     ? "Log"
+                                             : cur.a == static_cast<int>(Action::Details) ? "Details"
+                                             : cur.a == static_cast<int>(Action::Answer)  ? "Answer"
+                                                                                          : "Terminal"));
+      default: return "";
     }
   };
 
@@ -428,14 +458,18 @@ int cmd_ui(const Args&) {
       last_load = now;
     }
     if (!status.empty() && now > status_until) status.clear();
+    if (cur.act == tui::Act::Card && tab == kBoard && overlay == Overlay::None) {
+      view.lane = cur.a;
+      view.index = cur.b;
+      tui::clamp_selection(model, view);
+    }
 
     // --- Draw ---------------------------------------------------------------
     screen.clear();
     hits.clear();
     int W = screen.width(), H = screen.height();
     int SW = tui::sidebar_width(W);
-    if (SW == 0) side = false;
-    if (SW) tui::render_sidebar(screen, {0, 0, SW, H - 1}, fleet, side_sel, side, now, hits);
+    if (SW) tui::render_sidebar(screen, {0, 0, SW, H - 1}, fleet, cur, now, hits);
     tui::Rect main_r{SW, 0, W - SW, H - 1};
     std::string title = !remote_host.empty() ? remote_name + " · " + remote_host
                         : project            ? project->root.filename().string()
@@ -449,21 +483,27 @@ int cmd_ui(const Args&) {
           if (s.id == focus->id && s.machine == focus->host)
             title = s.what + (focus->host.empty() ? "" : "@" + focus->host) + " · " + g.name;
     }
-    tui::Rect in = tui::render_main_frame(screen, main_r, title, {tr("Progress"), tr("Agents"), tr("Activity")}, tab, !side, hits);
+    tui::Rect in = tui::render_main_frame(screen, main_r, title, {tr("Progress"), tr("Agents"), tr("Activity")}, tab,
+                                          !in_sidebar(cur), hits);
     const tui::Item* sel = selected_item();
     std::vector<Button> buttons = buttons_for(sel);
+    std::vector<Button> review_buttons;
+    if (overlay == Overlay::Review) {
+      review_buttons = {{Action::Merge, tr("Merge")}, {Action::Return, tr("Return")}, {Action::Discard, tr("Discard")}};
+      for (const auto& b : buttons)
+        if (b.action == Action::Terminal || b.action == Action::Answer) review_buttons.push_back(b);
+      review_buttons.push_back({Action::Log, tr("Log")});
+    }
     tui::Screen sub;
-    sub.resize(std::max(1, in.w), std::max(1, in.h));
+    sub.resize(std::max(1, in.w), std::max(1, in.h - (overlay == Overlay::Review ? 2 : 0)));
     bool drew_sub = true;
     if (overlay == Overlay::Log && project) tui::render_log(sub, *project, open_run, scroll, now);
     else if (overlay == Overlay::Task && project) tui::render_task(sub, *project, open_task);
     else if (overlay == Overlay::Review && project)
       tui::render_review(sub, *project, summarize(open_run, load_events(project->run_file(open_run))), stat);
-    else if (tab == kActivity) tui::render_activity(sub, activity, activity_scroll, now);
+    else if (tab == kActivity) tui::render_activity(sub, activity, activity_scroll, now, project ? project->root.filename().string() : "");
     else drew_sub = false;
-    bool show_grid = !drew_sub && tab == kGrid && overlay != Overlay::Focus;
     if (overlay == Overlay::Focus && focus) {
-      drew_sub = true;
       if (focus->vt.cols() != in.w || focus->vt.rows() != in.h) {
         focus->vt.resize(in.w, in.h);
         json::Object r;
@@ -476,18 +516,39 @@ int cmd_ui(const Args&) {
       focus->vt.draw(screen, in.x, in.y, in.w, in.h, true);
     } else if (drew_sub) {
       screen.blit(sub, in.x, in.y);
-    } else if (show_grid) {
+      if (overlay == Overlay::Review) tui::draw_buttons(screen, in.x, in.y + in.h - 1, in.w, review_buttons, cur, hits);
+    } else if (tab == kGrid) {
       std::vector<tui::Tile> tiles;
       for (const auto& w : grid) tiles.push_back({w.title, w.vt.get()});
-      tui::render_grid(screen, in, tiles, grid_sel, !side, hits);
-      in_last = in;
+      tui::render_grid(screen, in, tiles, cur, hits);
+    } else if (project || !remote_host.empty()) {
+      tui::render_board(screen, in, model, view, cur, buttons, now, hits);
+    } else {
+      screen.put(in.x, in.y + 1, tr("No project in this folder. Pick one in the sidebar."), {});
     }
-    else if (project || !remote_host.empty()) tui::render_board(screen, in, model, view, !side, buttons, now, hits);
-    else screen.put(in.x, in.y + 1, tr("No project in this folder. Pick one in the sidebar."), {});
+
+    // The focus never points at nothing: when its element is gone, it goes
+    // to the nearest thing that is there.
+    bool read_only = overlay == Overlay::Log || overlay == Overlay::Task ||
+                     (tab == kActivity && overlay == Overlay::None);
+    if (overlay != Overlay::Focus && (cur.act != tui::Act::None || !read_only) && !tui::find_hit(hits, cur)) {
+      tui::Target was = cur;
+      cur = {};
+      if (was.act == tui::Act::Button && tab == kBoard && overlay == Overlay::None)
+        cur = {tui::Act::Card, view.lane, view.index};
+      if (!tui::find_hit(hits, cur)) {
+        cur = {};
+        for (const auto& h : hits)
+          if (h.focusable && (in_sidebar(was) ? in_sidebar(h.t) : !in_sidebar(h.t))) {
+            cur = h.t;
+            break;
+          }
+      }
+    }
 
     if (overlay == Overlay::Help) tui::render_help(screen, main_r);
     if (overlay == Overlay::Prompt) {
-      std::string what = asking == Ask::NewSession   ? trf("New session in {}", {new_name})
+      std::string what = asking == Ask::NewSession   ? trf("New agent in {}", {new_name})
                          : asking == Ask::AddMachine ? tr("Add a machine: its ssh host")
                                                      : tr("Comment for the agent");
       tui::render_prompt(screen, main_r, what, input, true);
@@ -500,38 +561,14 @@ int cmd_ui(const Args&) {
       case Overlay::Prompt:
       case Overlay::Confirm: keys = {{"enter", tr("confirm")}, {"esc", tr("cancel")}}; break;
       case Overlay::Help: keys = {{"esc", tr("close")}}; break;
-      case Overlay::Focus: keys = {{"ctrl-]", tr("back to the board")}, {tr("click"), tr("another session")}}; break;
-      case Overlay::Review: {
-        keys = {{"m", tr("merge")}, {"r", tr("return with a comment")}, {"d", tr("discard")}};
-        if (sel)
-          for (const auto& b : buttons)
-            if (b.action == Action::Terminal || b.action == Action::Answer) keys.push_back({"t", b.label});
-        keys.push_back({"o", tr("log")});
-        keys.push_back({"esc", tr("back")});
-        break;
-      }
-      case Overlay::Log:
-      case Overlay::Task: keys = {{"↑↓", tr("scroll")}, {"esc", tr("back")}}; break;
-      case Overlay::None:
-        if (side) {
-          keys = {{"enter", tr("open")}, {"x", tr("remove")}, {"→", tr("board")}};
-        } else if (tab == kGrid) {
-          keys = {{"enter", tr("open")}, {"←→↑↓", tr("move")}};
-        } else if (tab == kActivity) {
-          keys = {{"↑↓", tr("scroll")}};
-        } else {
-          // The card's own actions sit on its buttons, each with its key.
-          if (!buttons.empty()) {
-            std::string l = buttons.front().label;
-            if (!l.empty() && l[0] >= 'A' && l[0] <= 'Z') l[0] = static_cast<char>(l[0] - 'A' + 'a');
-            keys.push_back({"enter", l});
-          }
-        }
+      case Overlay::Focus: keys = {{"ctrl-]", tr("back")}}; break;
+      default: {
+        std::string what = enter_label(buttons);
+        if (!what.empty()) keys.push_back({"enter", what});
+        if (overlay != Overlay::None) keys.push_back({"esc", tr("back")});
         keys.push_back({"tab", tr("next view")});
-        keys.push_back({"n", tr("new session")});
-        keys.push_back({"?", tr("keys")});
         keys.push_back({"q", tr("quit")});
-        break;
+      }
     }
     tui::render_footer(screen, keys, status);
     term.write(screen.flush());
@@ -564,7 +601,7 @@ int cmd_ui(const Args&) {
     }
 
     if (overlay == Overlay::Prompt) {
-      if (k.key == Key::Esc) overlay = Overlay::None;
+      if (k.key == Key::Esc) overlay = asking == Ask::Return ? Overlay::Review : Overlay::None;
       else if (k.key == Key::Backspace) pop_utf8(input);
       else if (k.key == Key::Char && static_cast<unsigned char>(k.ch) >= 0x20) input += k.text;
       else if (k.key == Key::Enter) {
@@ -584,6 +621,7 @@ int cmd_ui(const Args&) {
           std::string err = review_return(*project, open_run, input);
           if (err.empty()) say(tr("returned to the agent"));
           else say(err);
+          cur = {tui::Act::Card, view.lane, view.index};
           reload();
         }
       }
@@ -601,43 +639,61 @@ int cmd_ui(const Args&) {
       continue;
     }
 
-    // Mouse.
-    if (k.key == Key::Click) {
-      const tui::Hit* h = tui::hit_at(hits, k.x, k.y);
-      if (!h || overlay == Overlay::Help) {
-        if (overlay == Overlay::Help) overlay = Overlay::None;
-        continue;
-      }
-      switch (h->act) {
-        case tui::Act::Tab: set_tab(h->a); break;
-        case tui::Act::Side:
-          if (side && side_sel == h->a) activate_side();
-          side = true;
-          side_sel = h->a;
+    // Doing what an element is for: Enter on it, or a click.
+    auto activate = [&](const tui::Target& t) {
+      switch (t.act) {
+        case tui::Act::Tab: set_tab(t.a); break;
+        case tui::Act::Project: open_project(t.a); break;
+        case tui::Act::Session: {
+          if (t.a >= static_cast<int>(fleet.projects.size())) break;
+          const auto& g = fleet.projects[static_cast<size_t>(t.a)];
+          if (t.b >= static_cast<int>(g.sessions.size())) break;
+          const auto& s = g.sessions[static_cast<size_t>(t.b)];
+          if (s.state == tui::SessionState::Exited) say(tr("the session has ended"));
+          else open_terminal(s.machine, s.id);
           break;
-        case tui::Act::Card:
-          if (!side && view.lane == h->a && view.index == h->b && sel) run_action(buttons.front().action, *sel);
-          side = false;
-          view.lane = h->a;
-          view.index = h->b;
+        }
+        case tui::Act::SessionEnd: ask_end_session(t.a, t.b); break;
+        case tui::Act::Machine:
+          if (t.a < static_cast<int>(fleet.machines.size()) && !fleet.machines[static_cast<size_t>(t.a)].error.empty())
+            say(fleet.machines[static_cast<size_t>(t.a)].name + ": " + fleet.machines[static_cast<size_t>(t.a)].error);
           break;
-        case tui::Act::Button:
-          if (sel) run_action(static_cast<Action>(h->a), *sel);
-          break;
-        case tui::Act::Tile:
-          if (!side && grid_sel == h->a && h->a < static_cast<int>(grid.size()))
-            open_terminal(grid[static_cast<size_t>(h->a)].host, grid[static_cast<size_t>(h->a)].id);
-          side = false;
-          grid_sel = h->a;
-          break;
-        case tui::Act::NewSession: start_new_session(); break;
+        case tui::Act::MachineRemove: ask_remove_machine(t.a); break;
         case tui::Act::AddMachine:
           input.clear();
           asking = Ask::AddMachine;
           overlay = Overlay::Prompt;
           break;
+        case tui::Act::Card:
+          if (sel && !buttons.empty()) run_action(buttons.front().action, sel);
+          break;
+        case tui::Act::Button: run_action(static_cast<Action>(t.a), sel); break;
+        case tui::Act::NewAgent: start_new_session(); break;
+        case tui::Act::Tile:
+          if (t.a < static_cast<int>(grid.size()))
+            open_terminal(grid[static_cast<size_t>(t.a)].host, grid[static_cast<size_t>(t.a)].id);
+          break;
         case tui::Act::None: break;
       }
+    };
+
+    // Mouse: a click on something already selected, or on anything that is
+    // a button, does it; otherwise it selects.
+    if (k.key == Key::Click) {
+      const tui::Hit* h = tui::hit_at(hits, k.x, k.y);
+      if (overlay == Overlay::Help) {
+        overlay = Overlay::None;
+        continue;
+      }
+      if (!h) continue;
+      tui::Target t = h->t;
+      bool button_like = t.act == tui::Act::Tab || t.act == tui::Act::Button || t.act == tui::Act::SessionEnd ||
+                         t.act == tui::Act::MachineRemove || t.act == tui::Act::AddMachine ||
+                         t.act == tui::Act::NewAgent;
+      bool again = t == cur;
+      if (t.act != tui::Act::Tab) cur = t;
+      if (cur.act == tui::Act::Card) view.lane = cur.a, view.index = cur.b;
+      if (button_like || again) activate(t);
       continue;
     }
 
@@ -651,8 +707,18 @@ int cmd_ui(const Args&) {
       continue;
     }
     if (k.key == Key::Esc) {
-      if (overlay != Overlay::None) overlay = Overlay::None;
-      else side = false;
+      if (overlay == Overlay::Log && !open_run.empty() && sel && sel->review) {
+        overlay = Overlay::Review;  // a log opened from the review goes back to it
+        cur = {tui::Act::Button, static_cast<int>(Action::Log), 0};
+      } else if (overlay != Overlay::None) {
+        overlay = Overlay::None;
+        cur = tab == kBoard ? tui::Target{tui::Act::Card, view.lane, view.index} : tui::Target{};
+      } else if (in_sidebar(cur)) {
+        cur = {};  // back to the main pane; the next frame picks its element
+        cur = tab == kBoard ? tui::Target{tui::Act::Card, view.lane, view.index}
+              : tab == kGrid ? tui::Target{tui::Act::Tile, 0, 0}
+                             : tui::Target{};
+      }
       continue;
     }
     if (c == 'q') {
@@ -664,97 +730,80 @@ int cmd_ui(const Args&) {
       continue;
     }
     if (overlay == Overlay::Help) continue;
-    bool up = k.key == Key::Up || k.key == Key::WheelUp || c == 'k';
-    bool down = k.key == Key::Down || k.key == Key::WheelDown || c == 'j';
+    bool up = k.key == Key::Up || c == 'k';
+    bool down = k.key == Key::Down || c == 'j';
     bool left = k.key == Key::Left || c == 'h';
     bool right = k.key == Key::Right || c == 'l';
 
-    if (overlay == Overlay::Log || overlay == Overlay::Task) {
-      if (up) scroll = std::max(0, scroll - 1);
-      if (down) ++scroll;
+    if (k.key == Key::Enter) {
+      activate(cur);
       continue;
     }
-    if (overlay == Overlay::Review) {
-      std::string err;
-      if (c == 'm') err = review_merge(*project, open_run);
-      else if (c == 'd') err = review_discard(*project, open_run);
-      else if (c == 'r') {
-        input.clear();
-        asking = Ask::Return;
-        overlay = Overlay::Prompt;
-        continue;
-      } else if (c == 't' && sel) {
-        for (const auto& b : buttons)
-          if (b.action == Action::Terminal || b.action == Action::Answer) run_action(b.action, *sel);
-        continue;
-      } else if (c == 'o') {
-        scroll = 0;
-        overlay = Overlay::Log;
-        continue;
-      } else {
+    // The wheel scrolls what is being read.
+    bool reading = overlay == Overlay::Log || overlay == Overlay::Task || (tab == kActivity && overlay == Overlay::None);
+    if (k.key == Key::WheelUp || k.key == Key::WheelDown) {
+      int d = k.key == Key::WheelUp ? -3 : 3;
+      if (tab == kActivity && overlay == Overlay::None) activity_scroll = std::max(0, activity_scroll + d);
+      else scroll = std::max(0, scroll + d);
+      continue;
+    }
+    if (!(up || down || left || right)) continue;
+    // Reading a pane: up and down scroll it; left goes to the sidebar.
+    if (reading && cur.act == tui::Act::None) {
+      int& sc = tab == kActivity && overlay == Overlay::None ? activity_scroll : scroll;
+      if (up) sc = std::max(0, sc - 1);
+      if (down) ++sc;
+      if (left)
+        for (const auto& h : hits)
+          if (h.focusable && in_sidebar(h.t)) {
+            cur = h.t;
+            break;
+          }
+      continue;
+    }
+
+    // On the board, up and down walk a lane even past what fits, and the
+    // buttons of a card sit to its right.
+    if (tab == kBoard && overlay == Overlay::None && (cur.act == tui::Act::Card || cur.act == tui::Act::Button)) {
+      int lane = view.lane, n = static_cast<int>(model.lanes[lane].size());
+      if ((down || up) && (cur.act == tui::Act::Card || cur.act == tui::Act::Button)) {
+        int to = view.index + (down ? 1 : -1);
+        if (to >= 0 && to < n) {
+          cur = {tui::Act::Card, lane, to};
+          continue;
+        }
+        if (cur.act == tui::Act::Button && up) {
+          cur = {tui::Act::Card, lane, view.index};
+          continue;
+        }
+      }
+      if (cur.act == tui::Act::Card && right && !buttons.empty()) {
+        cur = {tui::Act::Button, static_cast<int>(buttons.front().action), 0};
         continue;
       }
-      if (err.empty()) {
-        say(c == 'm' ? tr("merged into main") : tr("discarded; the task is open again"));
-        overlay = Overlay::None;
-        reload();
-      } else {
-        say(err);
+      if (cur.act == tui::Act::Button && (left || right)) {
+        int at = -1;
+        for (size_t i = 0; i < buttons.size(); ++i)
+          if (static_cast<int>(buttons[i].action) == cur.a) at = static_cast<int>(i);
+        int to = at + (right ? 1 : -1);
+        if (at >= 0 && to >= 0 && to < static_cast<int>(buttons.size())) {
+          cur = {tui::Act::Button, static_cast<int>(buttons[static_cast<size_t>(to)].action), 0};
+          continue;
+        }
+        if (left && at == 0) {
+          cur = {tui::Act::Card, lane, view.index};
+          continue;
+        }
+        if (right) cur = {tui::Act::Card, lane, view.index};  // past the last button: on to the next lane
       }
-      continue;
     }
-    if (c == 'n') {
-      start_new_session();
-      continue;
+    tui::Dir dir = up ? tui::Dir::Up : down ? tui::Dir::Down : left ? tui::Dir::Left : tui::Dir::Right;
+    if (const tui::Hit* h = tui::next_hit(hits, cur, dir)) {
+      cur = h->t;
+      if (cur.act == tui::Act::Card) view.lane = cur.a, view.index = cur.b;
+    } else if (right && in_sidebar(cur) && reading) {
+      cur = {};  // into the pane being read
     }
-    if (c == '+') {
-      input.clear();
-      asking = Ask::AddMachine;
-      overlay = Overlay::Prompt;
-      continue;
-    }
-    if (tab == kGrid) {
-      int n = static_cast<int>(grid.size());
-      int cols = tui::grid_columns(in_last, grid.size());
-      if (left && grid_sel % cols == 0 && SW) side = true;
-      else if (left) --grid_sel;
-      if (right) ++grid_sel;
-      if (up) grid_sel -= cols;
-      if (down) grid_sel += cols;
-      grid_sel = std::clamp(grid_sel, 0, std::max(0, n - 1));
-      if (k.key == Key::Enter && grid_sel < n) open_terminal(grid[static_cast<size_t>(grid_sel)].host, grid[static_cast<size_t>(grid_sel)].id);
-      continue;
-    }
-    if (tab == kActivity) {
-      if (up) activity_scroll = std::max(0, activity_scroll - 1);
-      if (down) ++activity_scroll;
-      if (left && SW) side = true;
-      if (right) side = false;
-      continue;
-    }
-    if (side) {
-      int rows = static_cast<int>(tui::side_rows(fleet).size());
-      if (up) side_sel = std::max(0, side_sel - 1);
-      if (down) side_sel = std::min(std::max(0, rows - 1), side_sel + 1);
-      if (right) side = false;
-      if (k.key == Key::Enter) activate_side();
-      if (c == 'x') ask_kill();
-      continue;
-    }
-    // The board.
-    if (left && view.lane == 0 && SW) {
-      side = true;
-      continue;
-    }
-    if (left) --view.lane, view.index = 0;
-    if (right) ++view.lane, view.index = 0;
-    if (up) --view.index;
-    if (down) ++view.index;
-    tui::clamp_selection(model, view);
-    if (!sel) continue;
-    if (k.key == Key::Enter && !buttons.empty()) run_action(buttons.front().action, *sel);
-    for (const auto& b : buttons)
-      if (b.key.size() == 1 && c == b.key[0]) run_action(b.action, *sel);
   }
 }
 

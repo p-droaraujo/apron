@@ -1,6 +1,8 @@
 #include "tui/app.hpp"
 
 #include <algorithm>
+#include <climits>
+#include <cstdlib>
 
 #include "core/i18n.hpp"
 #include "core/time.hpp"
@@ -11,9 +13,8 @@ namespace apron::tui {
 
 namespace {
 
-const Style kButton{Color::hex(0xe6e8eb), Color::hex(0x2a303a), false};
-const Style kButtonMain{Color::hex(0x0f1115), Color::hex(0x7aa2f7), true};
-const Style kTabOn{Color::hex(0xe6e8eb), Color::hex(kSelected), true};
+// One way to show focus: the accent color, on an outline, a bar or a bracket.
+const Style kFocus{Color::hex(0x7aa2f7), {}, true};
 
 const char* session_glyph(SessionState s) {
   switch (s) {
@@ -39,43 +40,52 @@ void put_right(Screen& sc, int x, int y, int w, const std::string& text, Style s
   if (tw <= w) sc.put(x + w - tw, y, text, s);
 }
 
+// A dashed box: a place that holds nothing yet.
+void draw_dashed(Screen& sc, Rect r, Style border) {
+  if (r.w < 2 || r.h < 2) return;
+  sc.put(r.x, r.y, "╭", border);
+  sc.put(r.x + r.w - 1, r.y, "╮", border);
+  sc.put(r.x, r.y + r.h - 1, "╰", border);
+  sc.put(r.x + r.w - 1, r.y + r.h - 1, "╯", border);
+  sc.fill(r.x + 1, r.y, r.w - 2, "┄", border);
+  sc.fill(r.x + 1, r.y + r.h - 1, r.w - 2, "┄", border);
+  for (int y = r.y + 1; y < r.y + r.h - 1; ++y) {
+    sc.put(r.x, y, "┆", border);
+    sc.put(r.x + r.w - 1, y, "┆", border);
+  }
+}
+
+void draw_new_agent(Screen& sc, Rect r, bool focused, int which, std::vector<Hit>& hits) {
+  for (int y = r.y; y < r.y + r.h; ++y) sc.fill(r.x, y, r.w, " ", kText);
+  draw_dashed(sc, r, focused ? kFocus : kLine);
+  std::string label = "+ " + tr("New agent");
+  int lw = text_width(label);
+  sc.put(r.x + std::max(1, (r.w - lw) / 2), r.y + r.h / 2, label, focused ? kFocus : kSoft);
+  hits.push_back({r.x, r.y, r.w, r.h, {Act::NewAgent, which, 0}});
+}
+
 // --- Cards ------------------------------------------------------------------------
 
-int card_lines(const Item& it, bool selected, bool with_buttons, int inner_w) {
+int card_lines(const Item& it, bool with_buttons, int inner_w) {
   int n = it.from_run ? 2 : 1;
   if (text_width(it.task) + 1 + text_width(it.title) > inner_w) ++n;  // the title's second line
   if (!it.detail.empty()) ++n;
-  if (selected && with_buttons) n += 2;  // a blank line, then the buttons
+  if (with_buttons) n += 2;  // a blank line, then the buttons
   return n;
 }
 
-Style card_border(const Item& it, bool selected) {
-  if (selected) return kBlue;
+Style card_border(const Item& it, bool focused) {
+  if (focused) return kFocus;
   if (it.state == RunState::Failed) return kRed;
   if (it.state == RunState::Waiting || it.review) return kAmber;
   return kLine;
 }
 
-// A button is its key and its name: " r Review ". The first one is also Enter.
-int draw_button(Screen& sc, int x, int y, const Button& b, bool main, int room) {
-  std::string name = " " + b.label + " ";
-  int w = 1 + text_width(b.key) + text_width(name);
-  if (w > room) return 0;
-  Style base = main ? kButtonMain : kButton;
-  Style key = base;
-  key.bold = true;
-  if (!main) key.fg = Color::hex(0x7aa2f7);
-  sc.put(x, y, " ", base);
-  sc.put(x + 1, y, b.key, key);
-  sc.put(x + 1 + text_width(b.key), y, name, base);
-  return w;
-}
-
-void draw_card(Screen& sc, int x, int y, int w, const Item& it, bool selected, const std::vector<Button>& buttons,
-               int64_t now, int lane, int index, std::vector<Hit>& hits) {
-  int h = card_lines(it, selected, !buttons.empty(), w - 4) + 2;
-  draw_box(sc, {x, y, w, h}, card_border(it, selected), selected);
-  hits.push_back({x, y, w, h, Act::Card, lane, index});
+void draw_card(Screen& sc, int x, int y, int w, const Item& it, bool focused, const std::vector<Button>& buttons,
+               const Target& focus, int64_t now, int lane, int index, std::vector<Hit>& hits) {
+  int h = card_lines(it, !buttons.empty(), w - 4) + 2;
+  draw_box(sc, {x, y, w, h}, card_border(it, focused), focused);
+  hits.push_back({x, y, w, h, {Act::Card, lane, index}});
   int iw = w - 4, cx = x + 2, cy = y + 1;
   if (it.from_run) {
     Style gs = state_style(it.state);
@@ -89,7 +99,7 @@ void draw_card(Screen& sc, int x, int y, int w, const Item& it, bool selected, c
   int tx = sc.put(cx, cy, it.task, kBold);
   // The title takes two lines before it is cut.
   int first = iw - tx - 1;
-  std::string title = it.title;
+  const std::string& title = it.title;
   if (text_width(title) <= first) {
     sc.put(cx + tx + 1, cy++, title, kText);
   } else {
@@ -111,36 +121,59 @@ void draw_card(Screen& sc, int x, int y, int w, const Item& it, bool selected, c
     sc.put(cx, cy, fit(it.detail, iw), ds);
     ++cy;
   }
-  if (selected && !buttons.empty()) {
-    ++cy;
-    int bx = cx;
-    for (size_t i = 0; i < buttons.size(); ++i) {
-      int bw = draw_button(sc, bx, cy, buttons[i], i == 0, cx + iw - bx);
-      if (bw == 0) break;
-      hits.push_back({bx, cy, bw, 1, Act::Button, static_cast<int>(buttons[i].action), 0});
-      bx += bw + 1;
-    }
-  }
+  if (!buttons.empty()) draw_buttons(sc, cx, cy + 1, iw, buttons, focus, hits);
 }
+
+int center_x(const Hit& h) { return h.x * 2 + h.w; }  // doubled, to stay in integers
+int center_y(const Hit& h) { return h.y * 2 + h.h; }
 
 }  // namespace
-
-std::vector<SideRow> side_rows(const Fleet& fleet) {
-  std::vector<SideRow> rows;
-  for (size_t g = 0; g < fleet.projects.size(); ++g) {
-    rows.push_back({SideRow::Kind::Project, static_cast<int>(g), 0});
-    for (size_t i = 0; i < fleet.projects[g].sessions.size(); ++i)
-      rows.push_back({SideRow::Kind::Session, static_cast<int>(g), static_cast<int>(i)});
-  }
-  for (size_t m = 0; m < fleet.machines.size(); ++m) rows.push_back({SideRow::Kind::Machine, static_cast<int>(m), 0});
-  return rows;
-}
 
 const Hit* hit_at(const std::vector<Hit>& hits, int x, int y) {
   // Later hits sit on top (a button inside its card).
   for (auto it = hits.rbegin(); it != hits.rend(); ++it)
     if (x >= it->x && x < it->x + it->w && y >= it->y && y < it->y + it->h) return &*it;
   return nullptr;
+}
+
+const Hit* find_hit(const std::vector<Hit>& hits, const Target& t) {
+  for (const auto& h : hits)
+    if (h.t == t) return &h;
+  return nullptr;
+}
+
+const Hit* next_hit(const std::vector<Hit>& hits, const Target& from, Dir dir) {
+  const Hit* cur = find_hit(hits, from);
+  if (!cur) return nullptr;
+  int cx = center_x(*cur), cy = center_y(*cur);
+  const Hit* best = nullptr;
+  long best_score = LONG_MAX;
+  for (const auto& h : hits) {
+    if (!h.focusable || &h == cur) continue;
+    // What sits inside the current element (a card's buttons) is entered on
+    // purpose, not passed through on the way elsewhere.
+    if (h.x >= cur->x && h.x + h.w <= cur->x + cur->w && h.y >= cur->y && h.y + h.h <= cur->y + cur->h) continue;
+    int hx = center_x(h), hy = center_y(h);
+    long along = 0, across = 0;
+    switch (dir) {
+      case Dir::Up: along = cy - hy, across = std::abs(hx - cx); break;
+      case Dir::Down: along = hy - cy, across = std::abs(hx - cx); break;
+      case Dir::Left: along = cx - hx, across = std::abs(hy - cy); break;
+      case Dir::Right: along = hx - cx, across = std::abs(hy - cy); break;
+    }
+    if (along <= 0) continue;
+    // Only what lies wholly beyond the current element's edge.
+    bool beyond = dir == Dir::Up     ? h.y + h.h <= cur->y
+                  : dir == Dir::Down ? h.y >= cur->y + cur->h
+                  : dir == Dir::Left ? h.x + h.w <= cur->x
+                                     : h.x >= cur->x + cur->w;
+    if (!beyond) continue;
+    // Moving down a column beats jumping to the next one.
+    bool vertical = dir == Dir::Up || dir == Dir::Down;
+    long score = along + across * (vertical ? 4 : 2);
+    if (score < best_score) best_score = score, best = &h;
+  }
+  return best;
 }
 
 int sidebar_width(int screen_w) {
@@ -164,62 +197,103 @@ void draw_box(Screen& sc, Rect r, Style border, bool heavy) {
   }
 }
 
-void render_sidebar(Screen& sc, Rect r, const Fleet& fleet, int selected, bool focused, int64_t now,
+int draw_buttons(Screen& sc, int x, int y, int w, const std::vector<Button>& buttons, const Target& focus,
+                 std::vector<Hit>& hits) {
+  int bx = x;
+  for (const auto& b : buttons) {
+    int bw = text_width(b.label) + 4;
+    if (bx + bw > x + w) break;
+    Target t{Act::Button, static_cast<int>(b.action), 0};
+    bool on = focus == t;
+    sc.put(bx, y, "[", on ? kFocus : kLine);
+    sc.put(bx + 2, y, b.label, on ? kFocus : kSoft);
+    sc.put(bx + bw - 1, y, "]", on ? kFocus : kLine);
+    hits.push_back({bx, y, bw, 1, t});
+    bx += bw + 1;
+  }
+  return bx - x;
+}
+
+void render_sidebar(Screen& sc, Rect r, const Fleet& fleet, const Target& focus, int64_t now,
                     std::vector<Hit>& hits) {
-  draw_box(sc, r, focused ? kBlue2 : kLine, false);
+  bool inside = focus.act == Act::Project || focus.act == Act::Session || focus.act == Act::SessionEnd ||
+                focus.act == Act::Machine || focus.act == Act::MachineRemove || focus.act == Act::AddMachine;
+  draw_box(sc, r, inside ? kBlue2 : kLine, false);
   sc.put(r.x + 2, r.y, " apron ", kBold);
   int x = r.x + 2, w = r.w - 4, y = r.y + 1, bottom = r.y + r.h - 1;
-  auto rows = side_rows(fleet);
-  int row_index = 0;
-  auto line = [&](int index, const std::string& left, Style ls, const std::string& right, Style rs, const char* glyph,
-                  Style gs, int indent) {
+
+  // A row: a bar on its left and the accent color while it has the focus.
+  // `action` is the row's button, shown on the right while the row or the
+  // button has the focus; otherwise the right side holds `right`.
+  auto line = [&](Target t, const std::string& left, Style ls, const std::string& right, Style rs, const char* glyph,
+                  Style gs, int indent, const std::string& action, Target action_t) {
     if (y >= bottom) return;
-    bool sel = index == selected;
-    Style bgs = sel && focused ? with_bg(kText, true) : kText;
-    if (sel && focused) sc.fill(r.x + 1, y, r.w - 2, " ", bgs);
+    bool on = focus == t;
+    bool show_action = !action.empty() && (on || focus == action_t);
+    if (on) sc.put(r.x + 1, y, "▌", kFocus);
     int cx = x + indent;
     if (glyph) {
-      sc.put(cx, y, glyph, sel && focused ? with_bg(gs, true) : gs);
+      sc.put(cx, y, glyph, gs);
       cx += 2;
     }
-    int rw = text_width(right);
-    sc.put(cx, y, fit(left, x + w - cx - rw - 1), sel && focused ? with_bg(ls, true) : (sel ? kBold : ls));
-    if (rw) put_right(sc, x, y, w, right, sel && focused ? with_bg(rs, true) : rs);
-    hits.push_back({r.x + 1, y, r.w - 2, 1, Act::Side, index, 0});
+    std::string rt = show_action ? "" : right;
+    int aw = show_action ? text_width(action) + 4 : 0;
+    int rw = std::max(text_width(rt), aw);
+    sc.put(cx, y, fit(left, x + w - cx - rw - 1), on ? kFocus : ls);
+    if (show_action) {
+      bool aon = focus == action_t;
+      int ax = x + w - aw;
+      sc.put(ax, y, "[", aon ? kFocus : kLine);
+      sc.put(ax + 2, y, action, aon ? kFocus : kSoft);
+      sc.put(ax + aw - 1, y, "]", aon ? kFocus : kLine);
+      hits.push_back({r.x + 1, y, ax - r.x - 2, 1, t});
+      hits.push_back({ax, y, aw, 1, action_t});
+    } else {
+      if (!rt.empty()) put_right(sc, x, y, w, rt, rs);
+      hits.push_back({r.x + 1, y, r.w - 2, 1, t});
+    }
     ++y;
   };
 
   ++y;
   sc.put(x, y, tr("Projects"), kDim);
-  sc.put(x + w - 1, y, "+", kSoft);
-  hits.push_back({x + w - 2, y, 3, 1, Act::NewSession, 0, 0});
   y += 2;
-  if (fleet.projects.empty()) sc.put(x, y++, tr("none yet"), kDim);
-  for (const auto& p : fleet.projects) {
-    line(row_index++, p.name, p.root.empty() ? kSoft : kText, p.machine, kDim, nullptr, kText, 0);
-    for (const auto& s : p.sessions) {
+  for (size_t gi = 0; gi < fleet.projects.size(); ++gi) {
+    const auto& p = fleet.projects[gi];
+    int g = static_cast<int>(gi);
+    line({Act::Project, g, 0}, p.name, p.root.empty() ? kSoft : kText, p.machine, kDim, nullptr, kText, 0, "", {});
+    for (size_t si = 0; si < p.sessions.size(); ++si) {
+      const auto& s = p.sessions[si];
+      int i = static_cast<int>(si);
       std::string who = s.what + (s.machine.empty() ? "" : "@" + s.machine);
       std::string when = s.state == SessionState::Exited ? tr("ended") : ago(now, s.since_ms);
-      line(row_index++, who, s.state == SessionState::Exited ? kDim : kSoft, when, kDim, session_glyph(s.state),
-           session_style(s.state), 2);
+      line({Act::Session, g, i}, who, s.state == SessionState::Exited ? kDim : kSoft, when, kDim,
+           session_glyph(s.state), session_style(s.state), 2, tr("End"), {Act::SessionEnd, g, i});
     }
   }
   if (y < bottom - 1) {
     ++y;
     sc.put(x, y, tr("Machines"), kDim);
-    sc.put(x + w - 1, y, "+", kSoft);
-    hits.push_back({x + w - 2, y, 3, 1, Act::AddMachine, 0, 0});
     y += 2;
   }
-  for (const auto& m : fleet.machines) {
+  for (size_t mi = 0; mi < fleet.machines.size(); ++mi) {
+    const auto& m = fleet.machines[mi];
+    int i = static_cast<int>(mi);
     std::string note;
     Style ns = kDim;
     if (m.here) note = tr("this machine");
     else if (m.ok) note = m.running ? trf("{} running", {std::to_string(m.running)}) : "";
     else if (m.seen_ms) note = trf("seen {} ago", {ago(now, m.seen_ms)}), ns = kAmber;
     else note = tr("unreachable"), ns = kAmber;
-    line(row_index++, m.name, m.ok || m.here ? kText : kSoft, note, ns, m.ok || m.here ? "●" : "○",
-         m.ok || m.here ? kSoft : kDim, 0);
+    line({Act::Machine, i, 0}, m.name, m.ok || m.here ? kText : kSoft, note, ns, m.ok || m.here ? "●" : "○",
+         m.ok || m.here ? kSoft : kDim, 0, m.here ? "" : tr("Remove"), {Act::MachineRemove, i, 0});
+  }
+  if (y < bottom) {
+    Target t{Act::AddMachine, 0, 0};
+    bool on = focus == t;
+    if (on) sc.put(r.x + 1, y, "▌", kFocus);
+    sc.put(x, y, "+ " + tr("Add machine"), on ? kFocus : kDim);
+    hits.push_back({r.x + 1, y, r.w - 2, 1, t});
   }
 }
 
@@ -233,17 +307,19 @@ Rect render_main_frame(Screen& sc, Rect r, const std::string& title, const std::
   for (size_t i = 0; i < tabs.size(); ++i) {
     std::string label = " " + tabs[i] + " ";
     int tw = text_width(label);
-    sc.put(tx, r.y, label, static_cast<int>(i) == active ? kTabOn : kDim);
-    hits.push_back({tx, r.y, tw, 1, Act::Tab, static_cast<int>(i), 0});
+    sc.put(tx, r.y, label, static_cast<int>(i) == active ? kFocus : kDim);
+    hits.push_back({tx, r.y, tw, 1, {Act::Tab, static_cast<int>(i), 0}, false});
     tx += tw;
     if (i + 1 < tabs.size()) sc.put(tx++, r.y, " ", kDim);
   }
   return {r.x + 2, r.y + 1, r.w - 4, r.h - 2};
 }
 
-void render_board(Screen& sc, Rect r, const Model& m, const View& v, bool focused, const std::vector<Button>& buttons,
-                  int64_t now, std::vector<Hit>& hits) {
+void render_board(Screen& sc, Rect r, const Model& m, const View& v, const Target& focus,
+                  const std::vector<Button>& buttons, int64_t now, std::vector<Hit>& hits) {
   const std::string names[4] = {tr("Plan"), tr("Running"), tr("Gates"), tr("Done")};
+  // The current card shows its buttons while it or one of them has the focus.
+  bool on_card = focus == Target{Act::Card, v.lane, v.index} || focus.act == Act::Button;
   // Running and Gates hold boxes with more to say; Plan and Done are lists.
   int gap = 2;
   const int weight[4] = {2, 3, 3, 2};
@@ -261,93 +337,87 @@ void render_board(Screen& sc, Rect r, const Model& m, const View& v, bool focuse
     int hx = sc.put(lx, top, names[lane], kDim);
     sc.put(lx + hx + 1, top, std::to_string(items.size()), kSoft);
     int y = top + 2, bottom = r.y + r.h;
-    bool lane_sel = focused && v.lane == lane;
-    if (items.empty()) continue;
+    bool current_lane = v.lane == lane;
 
     if (lane == 0 || lane == 3) {
       // Plan and Done: plain lists; boxes are for work that is moving.
-      int start = std::max(0, (lane_sel ? v.index : 0) - (bottom - y - 3));
+      int start = std::max(0, (current_lane ? v.index : 0) - (bottom - y - 3));
       for (int i = start; i < static_cast<int>(items.size()) && y < bottom; ++i, ++y) {
         const Item& it = items[static_cast<size_t>(i)];
-        bool sel = lane_sel && i == v.index;
-        if (sel) sc.fill(lx, y, lw, " ", with_bg(kText, true));
+        bool on = focus == Target{Act::Card, lane, i};
+        if (on) sc.put(lx - 1, y, "▌", kFocus);
         const char* g = lane == 3 ? "✓" : it.ready ? "○" : "◌";
-        sc.put(lx, y, g, with_bg(lane == 3 || it.ready ? kSoft : kDim, sel));
-        int tx = sc.put(lx + 2, y, it.task, with_bg(lane == 3 || it.ready ? kText : kDim, sel));
-        sc.put(lx + 3 + tx, y, fit(it.title, lw - tx - 3), with_bg(lane == 3 || it.ready ? kSoft : kDim, sel));
-        hits.push_back({lx, y, lw, 1, Act::Card, lane, i});
+        bool lit = lane == 3 || it.ready;
+        sc.put(lx, y, g, lit ? kSoft : kDim);
+        int tx = sc.put(lx + 2, y, it.task, on ? kFocus : lit ? kText : kDim);
+        sc.put(lx + 3 + tx, y, fit(it.title, lw - tx - 3), on ? kFocus : lit ? kSoft : kDim);
+        hits.push_back({lx, y, lw, 1, {Act::Card, lane, i}});
       }
       if (start + (y - (top + 2)) < static_cast<int>(items.size()) && y < bottom)
-        sc.put(lx + 2, y, trf("{} more", {std::to_string(static_cast<int>(items.size()) - start - (y - (top + 2)))}), kDim);
-      if (lane_sel && !buttons.empty()) {
-        // The buttons of a listed row sit under the list.
-        int bx = lx;
-        if (y + 1 < bottom)
-          for (size_t i = 0; i < buttons.size(); ++i) {
-            int bw = draw_button(sc, bx, y + 1, buttons[i], i == 0, lx + lw - bx);
-            if (bw == 0) break;
-            hits.push_back({bx, y + 1, bw, 1, Act::Button, static_cast<int>(buttons[i].action), 0});
-            bx += bw + 1;
-          }
-      }
+        sc.put(lx + 2, y++, trf("{} more", {std::to_string(static_cast<int>(items.size()) - start - (y - (top + 2)))}),
+               kDim);
+      // The buttons of a listed row sit under the list.
+      if (current_lane && on_card && !buttons.empty() && y + 1 < bottom) draw_buttons(sc, lx, y + 1, lw, buttons, focus, hits);
       continue;
     }
 
-    // Scroll so the selected card is in view.
+    // Scroll so the current card is in view.
     std::vector<int> heights;
-    for (int i = 0; i < static_cast<int>(items.size()); ++i)
-      heights.push_back(card_lines(items[static_cast<size_t>(i)], lane_sel && i == v.index, !buttons.empty(), lw - 4) + 2);
+    for (int i = 0; i < static_cast<int>(items.size()); ++i) {
+      bool with = current_lane && i == v.index && on_card && !buttons.empty();
+      heights.push_back(card_lines(items[static_cast<size_t>(i)], with, lw - 4) + 2);
+    }
     int start = 0;
-    if (lane_sel) {
+    if (current_lane && !items.empty()) {
       auto span = [&](int a, int b) {
         int t = 0;
         for (int i = a; i <= b; ++i) t += heights[static_cast<size_t>(i)];
         return t;
       };
-      while (start < v.index && span(start, v.index) > bottom - y) ++start;
+      int idx = std::min(v.index, static_cast<int>(items.size()) - 1);
+      while (start < idx && span(start, idx) > bottom - y - (lane == 1 ? 3 : 0)) ++start;
     }
     if (start > 0) sc.put(lx + lw - 4, top, "↑" + std::to_string(start), kDim);
     int i = start;
     for (; i < static_cast<int>(items.size()); ++i) {
       int h = heights[static_cast<size_t>(i)];
       if (y + h > bottom) break;
-      bool sel = lane_sel && i == v.index;
-      draw_card(sc, lx, y, lw, items[static_cast<size_t>(i)], sel, sel ? buttons : std::vector<Button>{}, now, lane, i,
-                hits);
+      bool with = current_lane && i == v.index && on_card;
+      draw_card(sc, lx, y, lw, items[static_cast<size_t>(i)], focus == Target{Act::Card, lane, i},
+                with ? buttons : std::vector<Button>{}, focus, now, lane, i, hits);
       y += h;
     }
     if (i < static_cast<int>(items.size()) && y < bottom)
-      sc.put(lx, std::min(y, bottom - 1), trf("{} more", {std::to_string(static_cast<int>(items.size()) - i)}), kDim);
+      sc.put(lx, y++, trf("{} more", {std::to_string(static_cast<int>(items.size()) - i)}), kDim);
+    // Running always ends with a place to start another agent.
+    if (lane == 1 && y + 3 <= bottom) draw_new_agent(sc, {lx, y, lw, 3}, focus == Target{Act::NewAgent, 0, 0}, 0, hits);
   }
 }
 
-int grid_columns(Rect r, size_t tiles) {
-  if (tiles == 0) return 1;
+void render_grid(Screen& sc, Rect r, const std::vector<Tile>& tiles, const Target& focus, std::vector<Hit>& hits) {
+  size_t n = tiles.size() + 1;  // the last tile starts a new agent
   int max_cols = std::max(1, r.w / 44);  // a tile narrower than this reads as noise
   int cols = 1;
-  while (cols < max_cols && static_cast<size_t>(cols * cols) < tiles) ++cols;
-  return std::min(cols, static_cast<int>(tiles));
-}
-
-void render_grid(Screen& sc, Rect r, const std::vector<Tile>& tiles, int selected, bool focused,
-                 std::vector<Hit>& hits) {
-  if (tiles.empty()) {
-    sc.put(r.x, r.y + 1, tr("No agent is running. n starts one."), kDim);
-    return;
-  }
-  int cols = grid_columns(r, tiles.size());
-  int rows = static_cast<int>((tiles.size() + static_cast<size_t>(cols) - 1) / static_cast<size_t>(cols));
+  while (cols < max_cols && static_cast<size_t>(cols * cols) < n) ++cols;
+  cols = std::min(cols, static_cast<int>(n));
+  int rows = static_cast<int>((n + static_cast<size_t>(cols) - 1) / static_cast<size_t>(cols));
   int tw = (r.w - (cols - 1)) / cols, th = std::max(4, (r.h - (rows - 1)) / rows);
-  for (size_t i = 0; i < tiles.size(); ++i) {
+  for (size_t i = 0; i < n; ++i) {
     int col = static_cast<int>(i) % cols, row = static_cast<int>(i) / cols;
     Rect t{r.x + col * (tw + 1), r.y + row * (th + 1), tw, th};
     if (t.y + t.h > r.y + r.h) break;
-    bool sel = focused && static_cast<int>(i) == selected;
+    if (i == tiles.size()) {
+      // Alone, the placeholder stays small; beside agents it takes a tile.
+      if (tiles.empty()) t = {r.x, r.y + 1, std::min(r.w, 44), 5};
+      draw_new_agent(sc, t, focus == Target{Act::NewAgent, 1, 0}, 1, hits);
+      break;
+    }
+    bool on = focus == Target{Act::Tile, static_cast<int>(i), 0};
     for (int y = t.y; y < t.y + t.h; ++y) sc.fill(t.x, y, t.w, " ", kText);
-    draw_box(sc, t, sel ? kBlue : kLine, sel);
-    sc.put(t.x + 2, t.y, " " + fit(tiles[i].title, t.w - 6) + " ", sel ? kBold : kSoft);
+    draw_box(sc, t, on ? kFocus : kLine, on);
+    sc.put(t.x + 2, t.y, " " + fit(tiles[i].title, t.w - 6) + " ", on ? kFocus : kSoft);
     if (tiles[i].vt) tiles[i].vt->draw(sc, t.x + 1, t.y + 1, t.w - 2, t.h - 2, false);
-    hits.push_back({t.x, t.y, t.w, t.h, Act::Tile, static_cast<int>(i), 0});
+    hits.push_back({t.x, t.y, t.w, t.h, {Act::Tile, static_cast<int>(i), 0}});
   }
 }
 
@@ -376,12 +446,15 @@ void render_prompt(Screen& sc, Rect r, const std::string& title, const std::stri
 
 void render_help(Screen& sc, Rect r) {
   const std::pair<const char*, const char*> keys[] = {
-      {"tab", "next view"},          {"shift-tab", "previous view"}, {"←→↑↓ hjkl", "move"},
-      {"enter", "open"},             {"esc", "back"},                {"t", "the agent's terminal"},
-      {"o", "the run's log"},        {"n", "new session"},           {"+", "add a machine"},
-      {"x", "end a session, remove a machine"},        {"ctrl-]", "leave a terminal"}, {"q", "quit"},
+      {"←→↑↓ hjkl", "move"},   {"enter", "do what is selected"}, {"esc", "back"},
+      {"tab", "next view"},    {"ctrl-]", "leave a terminal"},  {"q", "quit"},
   };
-  int w = 46, h = static_cast<int>(std::size(keys)) + 4;
+  int key_w = 0, what_w = 0;
+  for (const auto& [k, what] : keys) {
+    key_w = std::max(key_w, text_width(k));
+    what_w = std::max(what_w, text_width(tr(what)));
+  }
+  int w = 3 + key_w + 3 + what_w + 3, h = static_cast<int>(std::size(keys)) + 4;
   Rect box{r.x + (r.w - w) / 2, r.y + std::max(0, (r.h - h) / 2), w, h};
   for (int y = box.y; y < box.y + box.h; ++y) sc.fill(box.x, y, box.w, " ", kText);
   draw_box(sc, box, kBlue, false);
@@ -389,7 +462,7 @@ void render_help(Screen& sc, Rect r) {
   int y = box.y + 2;
   for (const auto& [k, what] : keys) {
     sc.put(box.x + 3, y, k, kText);
-    sc.put(box.x + 17, y++, tr(what), kSoft);
+    sc.put(box.x + 3 + key_w + 3, y++, tr(what), kSoft);
   }
 }
 

@@ -53,32 +53,52 @@ struct Fleet {
   Model board;
 };
 
-// The selectable rows of the sidebar, top to bottom.
-struct SideRow {
-  enum class Kind { Project, Session, Machine } kind = Kind::Project;
-  int group = 0;  // index into projects, or into machines for Kind::Machine
-  int item = 0;   // index into the group's sessions
+// --- What can be pointed at -------------------------------------------------
+//
+// Everything a person can do is an element on the screen. Each frame the
+// renderers list the elements they drew as hits; the arrows move the focus
+// to the nearest one in that direction, Enter acts on it, and the mouse
+// clicks it.
+
+enum class Act {
+  None,
+  Tab,            // a: view (clicked, not focused: Tab cycles views)
+  Project,        // a: project
+  Session,        // a: project, b: session
+  SessionEnd,     // a: project, b: session
+  Machine,        // a: machine
+  MachineRemove,  // a: machine
+  AddMachine,
+  Card,           // a: lane, b: index
+  Button,         // a: Action, on the current card or overlay
+  NewAgent,       // a placeholder that starts an agent
+  Tile,           // a: tile
 };
-std::vector<SideRow> side_rows(const Fleet& fleet);
 
-// --- What the mouse can hit ---------------------------------------------------
-
-enum class Act { None, Tab, Side, Card, Button, NewSession, AddMachine, Tile };
+struct Target {
+  Act act = Act::None;
+  int a = 0, b = 0;
+  bool operator==(const Target&) const = default;
+};
 
 struct Hit {
   int x = 0, y = 0, w = 0, h = 0;
-  Act act = Act::None;
-  int a = 0, b = 0;
+  Target t;
+  bool focusable = true;
 };
 const Hit* hit_at(const std::vector<Hit>& hits, int x, int y);
+const Hit* find_hit(const std::vector<Hit>& hits, const Target& t);
 
-// --- Buttons on the selected card -------------------------------------------
+enum class Dir { Up, Down, Left, Right };
+// The focusable hit nearest to `from` in that direction, if there is one.
+const Hit* next_hit(const std::vector<Hit>& hits, const Target& from, Dir dir);
 
-enum class Action { Terminal, Answer, Review, Log, Details };
+// --- Buttons ------------------------------------------------------------------
+
+enum class Action { Terminal, Answer, Review, Log, Details, Merge, Return, Discard };
 
 struct Button {
   Action action;
-  std::string key;    // the letter that presses it; Enter presses the first one
   std::string label;
 };
 
@@ -90,24 +110,28 @@ struct Rect {
 
 int sidebar_width(int screen_w);  // 0 when the screen is too narrow for one
 void draw_box(Screen& sc, Rect r, Style border, bool heavy);
+// A row of buttons, `[ Label ]`; the focused one in the accent color.
+// Returns the width used.
+int draw_buttons(Screen& sc, int x, int y, int w, const std::vector<Button>& buttons, const Target& focus,
+                 std::vector<Hit>& hits);
 
-void render_sidebar(Screen& sc, Rect r, const Fleet& fleet, int selected, bool focused, int64_t now_ms,
+void render_sidebar(Screen& sc, Rect r, const Fleet& fleet, const Target& focus, int64_t now_ms,
                     std::vector<Hit>& hits);
 // The main pane's frame with the title on the left and the tabs on the right;
 // returns the inside.
 Rect render_main_frame(Screen& sc, Rect r, const std::string& title, const std::vector<std::string>& tabs, int active,
                        bool focused, std::vector<Hit>& hits);
-void render_board(Screen& sc, Rect r, const Model& model, const View& view, bool focused,
+// `view` names the current card: the one kept in sight, and the one whose
+// buttons show while it or one of them has the focus.
+void render_board(Screen& sc, Rect r, const Model& model, const View& view, const Target& focus,
                   const std::vector<Button>& buttons, int64_t now_ms, std::vector<Hit>& hits);
-// The grid: one tile per live session, its terminal drawn from the bottom.
+// The grid: one tile per live session, its terminal drawn from the bottom,
+// and a last tile that starts a new agent.
 struct Tile {
   std::string title;
   const class Vt* vt = nullptr;
 };
-void render_grid(Screen& sc, Rect r, const std::vector<Tile>& tiles, int selected, bool focused,
-                 std::vector<Hit>& hits);
-// How many tiles fit side by side, for moving up and down.
-int grid_columns(Rect r, size_t tiles);
+void render_grid(Screen& sc, Rect r, const std::vector<Tile>& tiles, const Target& focus, std::vector<Hit>& hits);
 
 void render_footer(Screen& sc, const std::vector<std::pair<std::string, std::string>>& keys, const std::string& status);
 // A small box in the middle of `r`: a line of text being typed, or a question.

@@ -3,22 +3,22 @@
 Apron is a terminal screen for the coding agents you run on your own machines. It shows which agents are working, which ones are waiting for you and what each one changed, and it takes you into an agent's terminal with one key. The agents keep running when you close the screen, put the laptop to sleep or lose the connection.
 
 ```
-╭─ apron ──────────────────╮╭─ shop ──────────────────────────────────────────────────────────── Progress   Activity ──╮
+╭─ apron ──────────────────╮╭─ shop ─────────────────────────────────────────────────── Progress   Agents   Activity ──╮
 │                          ││                                                                                          │
-│ Projects               + ││ Plan 2            Running 1                 Gates 2                   Done 2             │
+│ Projects                 ││ Plan 2            Running 1                 Gates 2                   Done 2             │
 │                          ││                                                                                          │
 │ shop                     ││ ○ S7 Rate limit…  ╭──────────────────────╮  ┏━━━━━━━━━━━━━━━━━━━━━━┓  ✓ S1 Price pars…   │
 │   ● claude         6m53s ││ ◌ S5 Load tests   │ ● claude@mac   6m53s │  ┃ ◐ codex@mac    5m33s ┃  ✓ S4 Cache for …   │
 │   ◐ codex          5m33s ││                   │ S6 JSON logs         │  ┃ S3 Order             ┃                     │
 │                          ││                   │ format defined, rep… │  ┃ confirmation email   ┃                     │
-│ Machines               + ││                   ╰──────────────────────╯  ┃ Can I send the emai… ┃                     │
-│                          ││                                             ┃                      ┃                     │
-│ ● mac       this machine ││                                             ┃  Answer   Log        ┃                     │
-│                          ││                                             ┗━━━━━━━━━━━━━━━━━━━━━━┛                     │
+│ Machines                 ││                   ╰──────────────────────╯  ┃ Can I send the emai… ┃                     │
+│                          ││                   ╭┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄╮  ┃                      ┃                     │
+│ ● mac       this machine ││                   ┆     + New agent      ┆  ┃ [ Answer ] [ Log ]   ┃                     │
+│ + Add machine            ││                   ╰┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄╯  ┗━━━━━━━━━━━━━━━━━━━━━━┛                     │
 │                          ││                                             1 more                                       │
 │                          ││                                                                                          │
 ╰──────────────────────────╯╰──────────────────────────────────────────────────────────────────────────────────────────╯
- enter answer   o log   tab next view   n new session   ? keys   q quit                                                 
+ enter answer   tab next view   q quit
 ```
 
 It runs inside the terminal you already use. Each machine runs a small daemon, `aprond`, that keeps the agents' terminals and their reports. The screen talks to the daemon on your machine directly and to the others over ssh. There is no account, no cloud service and no server in between.
@@ -47,26 +47,24 @@ apron new -- claude     # an agent in a session that outlives this terminal; Ctr
 apron                   # the screen
 ```
 
-On the screen, the left side lists your projects with their sessions, and your machines. The right side is the board of the selected project: the plan, what is running, what waits for you, and what is done. Select a card and its actions show on it; the footer lists the keys that work where you are.
+On the screen, the left side lists your projects with their sessions, and your machines. The right side shows the selected project: its board (the plan, what is running, what waits for you, what is done), its agents live side by side, and its activity.
+
+Everything you can do is something on the screen: a card, a button, a session, a `+ New agent` place. Move to it with the arrows and press Enter, or click it. The footer says what Enter does where you are. Besides that there are only a few keys:
 
 | Key | |
 | --- | --- |
-| Enter | open: the agent's terminal, a review, a task |
-| Tab, Shift-Tab | the next or previous view (Progress, Activity) |
-| ← → ↑ ↓ | move; left of the board is the sidebar |
+| ← → ↑ ↓ | move; on a card, → goes to its buttons |
+| Enter | do what is selected |
 | Esc | back one level |
-| n | a new session in the selected project |
-| + | add a machine |
-| x | end a session, or remove a machine |
-| ? | every key |
-
-The mouse works too: click a card, a button, a session or a tab.
+| Tab, Shift-Tab | the next or previous view (Progress, Agents, Activity) |
+| Ctrl-] | leave an agent's terminal; the agent keeps running |
+| q | quit |
 
 A finished run waits in Gates. Open it to see its steps, checks, scope and changed files, then merge it into `main`, return it to the agent with a comment, or discard it.
 
 ## Other machines
 
-Press `+` and type a host you reach with `ssh`, such as a name from `~/.ssh/config`. Apron must be installed there, and ssh must log in without a password prompt (keys, an agent, or Tailscale SSH). Apron can do on that machine exactly what your ssh login can do. Its projects and sessions show in the sidebar, and its boards open like local ones.
+Choose `+ Add machine` and type a host you reach with `ssh`, such as a name from `~/.ssh/config`. Apron must be installed there, and ssh must log in without a password prompt (keys, an agent, or Tailscale SSH). Apron can do on that machine exactly what your ssh login can do. Its projects and sessions show in the sidebar, and its boards open like local ones.
 
 ## For agents
 

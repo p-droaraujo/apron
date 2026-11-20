@@ -5,12 +5,14 @@
 #include <termios.h>
 #include <unistd.h>
 
+#include <algorithm>
 #include <atomic>
 #include <cstdlib>
 #include <cstring>
 #include <charconv>
 #include <cstdio>
 #include <filesystem>
+#include <string_view>
 
 #include "cli/common.hpp"
 #include "cli/daemon_client.hpp"
@@ -36,7 +38,22 @@ void term_size(int& cols, int& rows) {
 std::optional<DaemonClient> connect(bool autostart) { return connect_to("", autostart); }
 
 
-constexpr char kDetachKey = 0x1d;  // Ctrl-]
+// Ctrl-] as the terminal sends it: plain, or encoded by the keyboard modes an
+// agent can turn on (the kitty protocol, xterm's modifyOtherKeys).
+constexpr std::string_view kDetachKeys[] = {"\x1d", "\x1b[93;5u", "\x1b[27;5;93~", "\x1b[93;5:1u"};
+
+size_t find_detach(const std::string& in) {
+  size_t best = std::string::npos;
+  for (auto k : kDetachKeys) best = std::min(best, in.find(k));
+  return best;
+}
+
+// Whatever the session turned on stays on in this terminal after we leave:
+// mouse reports, bracketed paste, focus events, the kitty keyboard protocol,
+// application keys, a scroll region, the alternate screen. Turn it all off.
+constexpr const char* kResetModes =
+    "\x1b[?1000l\x1b[?1002l\x1b[?1003l\x1b[?1006l\x1b[?1015l\x1b[?2004l\x1b[?1004l"
+    "\x1b[=0;1u\x1b[<u\x1b[>4;0m\x1b[?1l\x1b>\x1b[r\x1b[0m\x1b[?25h\x1b[?1049l";
 
 // Raw passthrough between this terminal and a session, until Ctrl-] or exit.
 int attach(DaemonClient& c, uint32_t id) {
@@ -93,7 +110,7 @@ int attach(DaemonClient& c, uint32_t id) {
       ssize_t n = ::read(STDIN_FILENO, buf, sizeof buf);
       if (n <= 0) break;
       std::string in(buf, static_cast<size_t>(n));
-      if (auto k = in.find(kDetachKey); k != std::string::npos) {
+      if (auto k = find_detach(in); k != std::string::npos) {
         in.resize(k);
         done = true;
       }
@@ -108,6 +125,8 @@ int attach(DaemonClient& c, uint32_t id) {
     }
   }
   if (tty) {
+    ssize_t w = ::write(STDOUT_FILENO, kResetModes, std::strlen(kResetModes));
+    (void)w;
     tcsetattr(STDIN_FILENO, TCSAFLUSH, &saved);
     std::fprintf(stderr, "\r\n%s\n", trf("[detached from session {}]", {std::to_string(id)}).c_str());
   }

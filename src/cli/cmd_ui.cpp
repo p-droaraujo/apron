@@ -120,24 +120,26 @@ int cmd_ui(const Args&) {
                 session_live(remote_host, it->session);
     if (!remote_host.empty()) {
       // A project on another machine: its terminal is reachable; its files are not here.
-      if (live) b.push_back({it->state == RunState::Waiting ? Action::Answer : Action::Terminal, "enter",
+      if (live) b.push_back({it->state == RunState::Waiting ? Action::Answer : Action::Terminal, "t",
                              it->state == RunState::Waiting ? tr("Answer") : tr("Terminal")});
       return b;
     }
-    if (it->review) b.push_back({Action::Review, "", tr("Review")});
+    if (it->review) b.push_back({Action::Review, "r", tr("Review")});
     if (live) {
       bool answer = it->state == RunState::Waiting;
       b.push_back({answer ? Action::Answer : Action::Terminal, "t", answer ? tr("Answer") : tr("Terminal")});
     }
     if (!it->run.empty()) b.push_back({Action::Log, "o", tr("Log")});
-    else b.push_back({Action::Details, "", tr("Details")});
-    b.front().key = "enter";
+    else b.push_back({Action::Details, "d", tr("Details")});
     return b;
   };
   // Hands the screen to a session and takes it back after Ctrl-].
   auto open_terminal = [&](const std::string& host, uint32_t id) {
     term.suspend();
+    // The window title says how to come back while the agent owns the screen.
+    term.write("\x1b[22;0t\x1b]2;" + tr("apron · Ctrl-] returns") + "\x07");
     int rc = attach_session(host, id);
+    term.write("\x1b[23;0t");
     term.resume();
     screen.resize(term.width(), term.height());
     poller.poke();
@@ -324,10 +326,11 @@ int cmd_ui(const Args&) {
         } else if (tab == 1) {
           keys = {{"↑↓", tr("scroll")}};
         } else {
-          for (const auto& b : buttons) {
-            std::string l = b.label;
+          // The card's own actions sit on its buttons, each with its key.
+          if (!buttons.empty()) {
+            std::string l = buttons.front().label;
             if (!l.empty() && l[0] >= 'A' && l[0] <= 'Z') l[0] = static_cast<char>(l[0] - 'A' + 'a');
-            keys.push_back({b.key, l});
+            keys.push_back({"enter", l});
           }
         }
         keys.push_back({"tab", tr("next view")});
@@ -515,7 +518,7 @@ int cmd_ui(const Args&) {
     if (down) ++view.index;
     tui::clamp_selection(model, view);
     if (!sel) continue;
-    if (k.key == Key::Enter) run_action(buttons.front().action, *sel);
+    if (k.key == Key::Enter && !buttons.empty()) run_action(buttons.front().action, *sel);
     for (const auto& b : buttons)
       if (b.key.size() == 1 && c == b.key[0]) run_action(b.action, *sel);
   }

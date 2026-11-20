@@ -164,6 +164,7 @@ const std::unordered_map<std::string_view, std::string_view>& pt_br() {
       {"remove", "remover"},
       {"could not end the session", "não foi possível encerrar a sessão"},
       {"end a session, remove a machine", "encerrar uma sessão, remover uma máquina"},
+      {"apron · Ctrl-] returns", "apron · Ctrl-] volta"},
       {"could not write {}", "não foi possível gravar {}"},
       {"usage: apron machines [add <ssh host> [apron command there] | rm <ssh host>]", "uso: apron machines [add <host ssh> [comando do apron lá] | rm <host ssh>]"},
       {"aprond is running on {}", "o aprond está rodando em {}"},

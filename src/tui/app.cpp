@@ -55,6 +55,21 @@ Style card_border(const Item& it, bool selected) {
   return kLine;
 }
 
+// A button is its key and its name: " r Review ". The first one is also Enter.
+int draw_button(Screen& sc, int x, int y, const Button& b, bool main, int room) {
+  std::string name = " " + b.label + " ";
+  int w = 1 + text_width(b.key) + text_width(name);
+  if (w > room) return 0;
+  Style base = main ? kButtonMain : kButton;
+  Style key = base;
+  key.bold = true;
+  if (!main) key.fg = Color::hex(0x7aa2f7);
+  sc.put(x, y, " ", base);
+  sc.put(x + 1, y, b.key, key);
+  sc.put(x + 1 + text_width(b.key), y, name, base);
+  return w;
+}
+
 void draw_card(Screen& sc, int x, int y, int w, const Item& it, bool selected, const std::vector<Button>& buttons,
                int64_t now, int lane, int index, std::vector<Hit>& hits) {
   int h = card_lines(it, selected, !buttons.empty(), w - 4) + 2;
@@ -99,10 +114,8 @@ void draw_card(Screen& sc, int x, int y, int w, const Item& it, bool selected, c
     ++cy;
     int bx = cx;
     for (size_t i = 0; i < buttons.size(); ++i) {
-      std::string label = " " + buttons[i].label + " ";
-      int bw = text_width(label);
-      if (bx + bw > cx + iw) break;
-      sc.put(bx, cy, label, i == 0 ? kButtonMain : kButton);
+      int bw = draw_button(sc, bx, cy, buttons[i], i == 0, cx + iw - bx);
+      if (bw == 0) break;
       hits.push_back({bx, cy, bw, 1, Act::Button, static_cast<int>(buttons[i].action), 0});
       bx += bw + 1;
     }
@@ -270,10 +283,10 @@ void render_board(Screen& sc, Rect r, const Model& m, const View& v, bool focuse
         int bx = lx;
         if (y + 1 < bottom)
           for (size_t i = 0; i < buttons.size(); ++i) {
-            std::string label = " " + buttons[i].label + " ";
-            sc.put(bx, y + 1, label, i == 0 ? kButtonMain : kButton);
-            hits.push_back({bx, y + 1, text_width(label), 1, Act::Button, static_cast<int>(buttons[i].action), 0});
-            bx += text_width(label) + 1;
+            int bw = draw_button(sc, bx, y + 1, buttons[i], i == 0, lx + lw - bx);
+            if (bw == 0) break;
+            hits.push_back({bx, y + 1, bw, 1, Act::Button, static_cast<int>(buttons[i].action), 0});
+            bx += bw + 1;
           }
       }
       continue;

@@ -77,7 +77,7 @@ enum class Action { Terminal, Answer, Review, Log, Details };
 
 struct Button {
   Action action;
-  std::string key;    // "enter" for the first one, else its letter
+  std::string key;    // the letter that presses it; Enter presses the first one
   std::string label;
 };
 

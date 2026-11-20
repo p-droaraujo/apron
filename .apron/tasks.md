@@ -96,6 +96,12 @@ See every agent on one screen and reach the right terminal in one keystroke.
   done-when: aprond answers project.board for the projects it knows; choosing a project of another machine in the sidebar shows its lanes and Enter on a card with a live session opens that terminal over ssh
   checks: build, test
 
+- [x] T30 Leaving an agent's terminal always works and leaves nothing behind: Ctrl-] is recognized in every keyboard mode an agent can turn on, the modes it turned on are reset on the way out, and the window title says how to come back; card buttons show their keys
+  scope: src/cli/**, src/tui/**, src/core/i18n.cpp, tests/**
+  depends: T20
+  done-when: after attaching to Claude Code and pressing Ctrl-], the screen comes back with keys and mouse working; every button on a card shows the key that presses it
+  checks: build, test
+
 - [x] T22 Cut the commands: a person needs `apron` and `apron new`; agents use `run`, `report` and `check`; `hook`, `proxy` and `daemon` leave the help; the rest goes once the screen covers it
   scope: src/cli/**, src/core/i18n.cpp, tests/**, README.md, docs/**, AGENTS.md, integrations/**
   depends: T20

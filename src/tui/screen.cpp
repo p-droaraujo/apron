@@ -85,6 +85,10 @@ void Screen::blit(const Screen& src, int x, int y) {
     }
 }
 
+void Screen::set(int x, int y, const Cell& c) {
+  if (x >= 0 && x < w_ && y >= 0 && y < h_) back_[static_cast<size_t>(y * w_ + x)] = c;
+}
+
 void Screen::fill(int x, int y, int w, std::string_view ch, Style style) {
   for (int i = 0; i < w; ++i) put(x + i, y, ch, style, 1);
 }
@@ -99,6 +103,13 @@ std::string Screen::flush() {
     for (int x = 0; x < w_; ++x) {
       size_t i = static_cast<size_t>(y * w_ + x);
       if (!full_ && back_[i] == front_[i]) continue;
+      if (back_[i].ch.empty()) {
+        // The right half of a wide character: the terminal already moved
+        // past it when it drew the left half.
+        front_[i] = back_[i];
+        if (cur_y == y && cur_x == x) ++cur_x;
+        continue;
+      }
       if (cur_y != y || cur_x != x) {
         std::snprintf(buf, sizeof buf, "\x1b[%d;%dH", y + 1, x + 1);
         out += buf;

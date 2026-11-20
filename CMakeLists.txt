@@ -30,7 +30,7 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
-# Core with no external dependencies: JSON, events, tasks, i18n.
+# Core: JSON, events, tasks, i18n. Only the standard library.
 add_library(apron_core
   src/core/json.cpp
   src/core/events.cpp
@@ -46,6 +46,18 @@ add_library(apron_core
   src/core/board.cpp
 )
 
+# libghostty-vt (D5): the terminal emulation behind Focus and Grid. The build
+# fetches Ghostty at a pinned commit and runs zig on it, so zig must be on the
+# PATH (see CONTRIBUTING.md for the version). FETCHCONTENT_SOURCE_DIR_GHOSTTY
+# points at a local checkout instead.
+include(FetchContent)
+set(GHOSTTY_ZIG_BUILD_FLAGS "-Dapp-runtime=none;-Demit-xcframework=false" CACHE STRING "" FORCE)
+FetchContent_Declare(ghostty
+  GIT_REPOSITORY https://github.com/ghostty-org/ghostty.git
+  GIT_TAG f64f4aca2c29b554d111b36c3d946a9bddd159ff
+)
+FetchContent_MakeAvailable(ghostty)
+
 # The TUI: terminal, cell grid and the progress view.
 add_library(apron_tui
   src/tui/term.cpp
@@ -54,7 +66,7 @@ add_library(apron_tui
   src/tui/app.cpp
   src/tui/vt.cpp
 )
-target_link_libraries(apron_tui PUBLIC apron_core)
+target_link_libraries(apron_tui PUBLIC apron_core PRIVATE ghostty-vt-static)
 target_include_directories(apron_core PUBLIC src)
 
 # Protocol and daemon.

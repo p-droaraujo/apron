@@ -544,7 +544,9 @@ int cmd_ui(const Args&) {
     ++view.tick;
     if (focus) drain_focus();
     if (!grid_clients.empty()) drain_grid();
-    if (k.key == Key::None || k.key == Key::Wake) continue;
+    // Keys the screen does not know (F-keys, Alt combinations, the kitty
+    // encoding of Ctrl-]) still matter inside an agent's terminal.
+    if (k.key == Key::Wake || (k.key == Key::None && (k.raw.empty() || overlay != Overlay::Focus))) continue;
     if (k.key == Key::Resize) {
       screen.resize(term.width(), term.height());
       continue;

@@ -137,7 +137,7 @@ TEST("activity: events of several projects, newest first") {
   fs::remove_all(b);
 }
 
-TEST("vt: text, colors, cursor, erase, alternate screen and replies") {
+TEST("vt (libghostty-vt): text, colors, cursor, erase, alternate screen and replies") {
   Vt vt(20, 5);
   vt.feed("hello\r\nworld");
   CHECK_EQ(vt.cell(0, 0).ch, std::string("h"));
@@ -162,4 +162,8 @@ TEST("vt: text, colors, cursor, erase, alternate screen and replies") {
   CHECK_EQ(vt.cell(0, 4).ch, std::string("l"));  // scrolled, the last line at the bottom
   vt.feed("\x1b[?1h");
   CHECK(vt.app_cursor());
+  vt.feed("\x1b[2J\x1b[H日x");  // a wide character takes two cells
+  CHECK_EQ(vt.cell(0, 0).ch, std::string("日"));
+  CHECK_EQ(vt.cell(1, 0).ch, std::string(""));
+  CHECK_EQ(vt.cell(2, 0).ch, std::string("x"));
 }

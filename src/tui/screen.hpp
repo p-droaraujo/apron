@@ -40,6 +40,8 @@ class Screen {
   // Returns the columns used.
   int put(int x, int y, std::string_view text, Style style, int max_w = -1);
   void fill(int x, int y, int w, std::string_view ch, Style style);
+  // One cell as given; an empty `ch` marks the right half of a wide character.
+  void set(int x, int y, const Cell& c);
   const Cell& at(int x, int y) const { return back_[static_cast<size_t>(y * w_ + x)]; }
   // Copies another screen's cells here, with its top-left corner at (x, y).
   void blit(const Screen& src, int x, int y);

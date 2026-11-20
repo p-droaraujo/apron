@@ -114,6 +114,12 @@ See every agent on one screen and reach the right terminal in one keystroke.
   done-when: a third view shows one tile per live session of every machine, updating as they write, and Enter or a click opens the tile in Focus
   checks: build, test
 
+- [x] T33 Agent terminals through libghostty-vt, as D5 decided: Focus and Grid draw what libghostty-vt parses; our own emulator goes away
+  scope: src/tui/**, src/cli/**, tests/**, CMakeLists.txt, README.md, CONTRIBUTING.md, AGENTS.md, docs/**
+  depends: T32
+  done-when: vt.cpp's parser is gone; Focus and Grid show Claude Code and a shell drawn from libghostty-vt's render state, with colors, cursor and the alternate screen; the terminal's answers to queries reach the agent; the build fetches Ghostty at a pinned commit and needs only zig on the PATH
+  checks: build, test
+
 - [x] T22 Cut the commands: a person needs `apron` and `apron new`; agents use `run`, `report` and `check`; `hook`, `proxy` and `daemon` leave the help; the rest goes once the screen covers it
   scope: src/cli/**, src/core/i18n.cpp, tests/**, README.md, docs/**, AGENTS.md, integrations/**
   depends: T20

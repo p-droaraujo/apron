@@ -177,11 +177,12 @@ Merge with confidence without opening the editor.
   done-when: the files are in the repository, README links them, and the GitHub repository has a product description and topics; visibility stays a person's choice
   checks: build, test
 
-- [ ] T23 `apron run finish` refuses files outside the task's scope unless the agent passes `--outside "reason"`, which the run records
+- [-] T23 `apron run finish` refuses files outside the task's scope unless the agent passes `--outside "reason"`, which the run records
   scope: src/cli/**, src/core/**, tests/**, docs/**, AGENTS.md, integrations/**
   depends: T19
   done-when: finishing with files outside the scope fails with the list; with --outside it passes and the reason shows in the log and the review
   checks: build, test
+  decision: cut (D61). The review already shows the files outside the scope before a merge; a refusal only teaches agents to add --outside every time.
 
 - [ ] T24 Agents survive an upgrade of aprond: the new daemon takes over the running sessions' terminals instead of closing them
   scope: src/daemon/**, src/proto/**, src/cli/**, tests/**, docs/**

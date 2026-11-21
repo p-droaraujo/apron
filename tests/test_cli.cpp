@@ -64,7 +64,10 @@ TEST("cli: a run reported while aprond runs shows up in its projects, linked to 
   std::string apron = std::string(APRON_BINARY_DIR) + "/apron";
 
   // Without a daemon the run still works: the file is the source.
-  CHECK(sh(env + apron + " run start D1 --intent demo").find("r-D1-") != std::string::npos);
+  CHECK(sh(env + apron + " run start 2>/dev/null").find("D1 ") != std::string::npos);  // ready to pick
+  std::string started = sh(env + apron + " run start D1 --intent demo 2>&1");
+  CHECK(started.find("r-D1-") != std::string::npos);
+  CHECK(started.find("done-when:") != std::string::npos);  // the agent gets its task
 
   pid_t daemon = fork();
   if (daemon == 0) {

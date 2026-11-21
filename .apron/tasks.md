@@ -114,6 +114,12 @@ See every agent on one screen and reach the right terminal in one keystroke.
   done-when: a third view shows one tile per live session of every machine, updating as they write, and Enter or a click opens the tile in Focus
   checks: build, test
 
+- [x] T36 Agents read their task, not the whole plan: `apron run start` lists the tasks ready to pick and, on start, prints the task an agent took
+  scope: src/cli/cmd_run.cpp, src/core/i18n.cpp, tests/**, AGENTS.md, docs/agent-protocol.md
+  depends: T35
+  done-when: `apron run start` with no task prints one line per task ready to pick; `apron run start <id>` prints the run id and then the task with its scope, done-when, decision and review; AGENTS.md tells agents to use these instead of reading tasks.md
+  checks: build, test
+
 - [x] T35 Every action is a visible element: arrows move the focus, Enter acts; one way to show focus; empty places hold a button, not a sentence
   scope: src/tui/**, src/cli/cmd_ui.cpp, src/core/i18n.cpp, tests/**
   depends: T34

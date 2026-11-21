@@ -52,6 +52,7 @@ struct Repo {
   std::string agent_run() {
     sh("git checkout -q -b apron/R1");
     std::string run = sh(apron + " run start R1 --intent work");
+    run = run.substr(0, run.find('\n'));  // the run id; the task follows on stderr
     run.erase(run.find_last_not_of("\n") + 1);
     std::ofstream(dir / "feature.txt") << "done\n";
     sh(apron + " run finish 'feature added'");

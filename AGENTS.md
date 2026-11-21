@@ -3,8 +3,8 @@
 This repository is managed by Apron, and Apron is built with itself. The full protocol is in [`docs/agent-protocol.md`](docs/agent-protocol.md); read it once. In short:
 
 1. Build: `cmake -S . -B build -G Ninja && cmake --build build`.
-2. Pick a `[ ]` task in `.apron/tasks.md` whose `depends` are `[x]`. A `review` field is a person's comment on an earlier run: it comes first.
-3. `./build/apron run start <id> --agent <your-name> --intent "<one sentence>"`. If it warns that your scope meets a run in progress, ask before going on.
+2. `./build/apron run start` lists the tasks ready to pick. Do not read all of `.apron/tasks.md`: it is the project's history and costs context.
+3. `./build/apron run start <id> --agent <your-name> --intent "<one sentence>"` prints your task: scope, done-when, decision, and `review`, a person's comment on an earlier run that comes first. If it warns that your scope meets a run in progress, ask before going on.
 4. `./build/apron report step "<what changed>"` on each change of phase; `report ask` for a person's decision (also when staying inside the `scope` would force a worse design); `report blocked` when something outside stops you; `report note` for what the next run should know.
 5. `./build/apron check`, then `./build/apron run finish --result done "<what was done; what was left out; what to look at first>"`.
 6. Commit on the task's branch with `tasks.md` included and the trailer `Apron-Run: <run id>`.

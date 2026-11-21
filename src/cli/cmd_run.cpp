@@ -46,8 +46,30 @@ void warn_overlaps(const Project& project, const TaskFile& file, const Task& tas
   }
 }
 
+// The task an agent takes, as it needs it: the line and the fields that say
+// what to do. The rest of tasks.md is history it does not need to read. On
+// stderr, so stdout stays the run id for scripts.
+static void print_task(const Task& t) {
+  std::fprintf(stderr, "\n%s %s\n", t.id.c_str(), t.title.c_str());
+  for (const char* key : {"scope", "done-when", "checks", "decision", "review"})
+    if (std::string v = t.field(key); !v.empty()) std::fprintf(stderr, "  %s: %s\n", key, v.c_str());
+}
+
 int run_start(const Args& args, const Project& project) {
-  if (args.pos.size() < 2) return fail(tr("usage: apron run start <task> [--agent name] [--intent \"sentence\"]"));
+  if (args.pos.size() < 2) {
+    // Without a task: the ones ready to pick, one line each.
+    auto file = TaskFile::load(project.tasks_file());
+    int ready = 0;
+    if (file)
+      for (const auto& t : file->tasks())
+        if (t.state == ' ' && blockers_to_start(*file, t).empty()) {
+          std::printf("%s %s\n", t.id.c_str(), t.title.c_str());
+          ++ready;
+        }
+    if (!ready) std::printf("%s\n", tr("no task is ready to pick").c_str());
+    std::fprintf(stderr, "%s\n", tr("usage: apron run start <task> [--agent name] [--intent \"sentence\"]").c_str());
+    return 0;
+  }
   if (auto current = project.current_run()) {
     return fail(trf("a run is already in progress in this worktree ({}); close it with apron run finish first",
                     {*current}));
@@ -87,6 +109,8 @@ int run_start(const Args& args, const Project& project) {
   project.set_current_run(e.run);
   if (task) sync_task(project, id, '~', e.agent + "@" + e.machine);
   std::printf("%s\n", e.run.c_str());
+  std::fflush(stdout);  // the id first, before the task on stderr
+  if (task) print_task(*task);
   if (task && file) warn_overlaps(project, *file, *task, e);
   return 0;
 }

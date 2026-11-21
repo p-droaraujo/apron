@@ -101,6 +101,7 @@ const std::unordered_map<std::string_view, std::string_view>& pt_br() {
       {"check passed", "check passou"},
       {"check failed", "check falhou"},
       {"returned", "devolvido"},
+      {"no task is ready to pick", "nenhuma tarefa pronta para pegar"},
       {"Agents", "Agentes"},
       {"merged", "mesclada"},
       {"returned to the agent", "devolvida ao agente"},

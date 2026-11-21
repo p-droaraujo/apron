@@ -61,7 +61,8 @@ A task without `scope` or `done-when` cannot be picked up: Apron refuses `run st
 ## 3. The life of a run
 
 ```
-apron run start T6 --intent "..."      →  [~] in tasks.md, run.started event
+apron run start                         →  the tasks ready to pick, one line each
+apron run start T6 --intent "..."      →  [~] in tasks.md, run.started event; prints the task
 apron report step "..."                 →  trajectory
 apron report ask "..."                  →  ◐ waiting for you; [?] in tasks.md
 apron report blocked "..."              →  ⊘ no power, with the reason
@@ -72,6 +73,8 @@ git commit (with Apron-Run: <id>)       →  tasks.md and code change together
 ```
 
 Then a person reviews the run (Enter on its card in Gates): **merge** fast-forwards `main` to the run's commit and never merges over a `main` that moved on; **return** reopens the task with the person's comment in its `review` field; **discard** reopens the task and deletes nothing.
+
+An agent reads its task from `run start`, not from `tasks.md`: the file keeps every task the project ever had, and reading it whole costs context that grows with the project.
 
 The commit comes after `finish`, because `finish` changes the state in `tasks.md`. The `Apron-Run` trailer links the commit to the run, and the commit body carries the summary: events stay out of git, but the story of the work survives the push.
 

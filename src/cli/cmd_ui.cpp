@@ -114,13 +114,16 @@ int cmd_ui(const Args&) {
     status = s;
     status_until = timeutil::now_ms() + 4000;
   };
+  // The main pane belongs to the project in its title; only the sidebar
+  // shows every project.
   auto local_roots = [&] {
     std::vector<std::string> roots;
-    if (project) roots.push_back(project->root.string());
-    for (const auto& g : fleet.projects)
-      if (g.machine.empty() && has_project(g.root) && (!project || g.root != project->root.string()))
-        roots.push_back(g.root);
+    if (project && remote_host.empty()) roots.push_back(project->root.string());
     return roots;
+  };
+  auto in_pane = [&](const tui::ProjectGroup& g) {
+    if (!remote_host.empty()) return g.machine == remote_host && g.root == remote_root;
+    return project && g.machine.empty() && g.root == project->root.string();
   };
   auto reload = [&] {
     fleet = poller.snapshot();
@@ -291,30 +294,6 @@ int cmd_ui(const Args&) {
     asking = Ask::NewSession;
     overlay = Overlay::Prompt;
   };
-  auto open_project = [&](int gi) {
-    if (gi >= static_cast<int>(fleet.projects.size())) return;
-    const auto& g = fleet.projects[static_cast<size_t>(gi)];
-    if (!g.machine.empty() && !g.root.empty()) {
-      remote_host = g.machine;
-      remote_root = g.root;
-      remote_name = g.name;
-      poller.watch(remote_host, remote_root);
-      model = {};
-    } else if (g.machine.empty() && has_project(g.root)) {
-      remote_host.clear();
-      poller.watch("", "");
-      project = Project{g.root};
-      model = tui::load_model(*project);
-    } else {
-      say(tr("this folder has no .apron/ yet"));
-      return;
-    }
-    view = {};
-    tui::clamp_selection(model, view);
-    overlay = Overlay::None;
-    tab = kBoard;
-    cur = {tui::Act::Card, view.lane, view.index};
-  };
   auto ask_end_session = [&](int gi, int si) {
     if (gi >= static_cast<int>(fleet.projects.size())) return;
     const auto& g = fleet.projects[static_cast<size_t>(gi)];
@@ -354,10 +333,10 @@ int cmd_ui(const Args&) {
     std::map<std::string, bool> reachable;
     for (const auto& m : fleet.machines) reachable[m.here ? "" : m.name] = m.ok || m.here;
     for (const auto& g : fleet.projects)
-      for (const auto& s : g.sessions)
-        if (s.state != tui::SessionState::Exited && reachable[s.machine])
-          live.emplace_back(s.machine, s.id, s.what + (s.machine.empty() ? "" : "@" + s.machine) + " · " + g.name,
-                            s.cols, s.rows);
+      if (in_pane(g))
+        for (const auto& s : g.sessions)
+          if (s.state != tui::SessionState::Exited && reachable[s.machine])
+            live.emplace_back(s.machine, s.id, s.what + (s.machine.empty() ? "" : "@" + s.machine), s.cols, s.rows);
     std::erase_if(grid, [&](const Watched& w) {
       for (const auto& [h, id, t, c, r] : live)
         if (h == w.host && id == w.id) return false;
@@ -404,6 +383,38 @@ int cmd_ui(const Args&) {
             w.vt->take_replies();  // only the terminal the agent draws for answers its questions
           }
       }
+  };
+  auto open_project = [&](int gi) {
+    if (gi >= static_cast<int>(fleet.projects.size())) return;
+    const auto& g = fleet.projects[static_cast<size_t>(gi)];
+    if (!g.machine.empty() && !g.root.empty()) {
+      remote_host = g.machine;
+      remote_root = g.root;
+      remote_name = g.name;
+      poller.watch(remote_host, remote_root);
+      model = {};
+    } else if (g.machine.empty() && has_project(g.root)) {
+      remote_host.clear();
+      poller.watch("", "");
+      project = Project{g.root};
+      model = tui::load_model(*project);
+    } else {
+      say(tr("this folder has no .apron/ yet"));
+      return;
+    }
+    view = {};
+    tui::clamp_selection(model, view);
+    overlay = Overlay::None;
+    // The views stay; what they show becomes this project.
+    activity = load_activity(local_roots(), 500);
+    activity_scroll = 0;
+    if (tab == kGrid) {
+      leave_grid();
+      sync_grid();
+    }
+    cur = tab == kBoard ? tui::Target{tui::Act::Card, view.lane, view.index}
+          : tab == kGrid ? tui::Target{tui::Act::Tile, 0, 0}
+                         : tui::Target{};
   };
   auto set_tab = [&](int t) {
     tab = (t + kViews) % kViews;
@@ -501,7 +512,7 @@ int cmd_ui(const Args&) {
     else if (overlay == Overlay::Task && project) tui::render_task(sub, *project, open_task);
     else if (overlay == Overlay::Review && project)
       tui::render_review(sub, *project, summarize(open_run, load_events(project->run_file(open_run))), stat);
-    else if (tab == kActivity) tui::render_activity(sub, activity, activity_scroll, now, project ? project->root.filename().string() : "");
+    else if (tab == kActivity) tui::render_activity(sub, activity, activity_scroll, now);
     else drew_sub = false;
     if (overlay == Overlay::Focus && focus) {
       if (focus->vt.cols() != in.w || focus->vt.rows() != in.h) {

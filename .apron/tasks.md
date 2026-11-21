@@ -114,6 +114,12 @@ See every agent on one screen and reach the right terminal in one keystroke.
   done-when: a third view shows one tile per live session of every machine, updating as they write, and Enter or a click opens the tile in Focus
   checks: build, test
 
+- [x] T37 The main pane belongs to the project chosen in the sidebar: Progress, Agents and Activity show only that project; the sidebar is the one place that shows everything
+  scope: src/cli/cmd_ui.cpp, src/tui/progress.cpp, src/tui/progress.hpp, src/core/i18n.cpp, tests/**, README.md
+  depends: T36
+  done-when: Activity lists the events of the project in the pane's title only, with no project column; Agents shows the live sessions of that project only; picking another project in the sidebar changes all three views
+  checks: build, test
+
 - [x] T36 Agents read their task, not the whole plan: `apron run start` lists the tasks ready to pick and, on start, prints the task an agent took
   scope: src/cli/cmd_run.cpp, src/core/i18n.cpp, tests/**, AGENTS.md, docs/agent-protocol.md
   depends: T35

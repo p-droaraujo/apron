@@ -148,7 +148,8 @@ void render_review(Screen& sc, const Project& project, const RunSummary& r, cons
 
 }
 
-void render_activity(Screen& sc, const std::vector<ActivityItem>& items, int scroll, int64_t now) {
+void render_activity(Screen& sc, const std::vector<ActivityItem>& items, int scroll, int64_t now,
+                     bool show_project) {
   sc.clear();
   int W = sc.width(), H = sc.height();
   if (items.empty()) sc.put(1, 0, tr("no activity yet"), kDim);
@@ -196,6 +197,7 @@ void render_activity(Screen& sc, const std::vector<ActivityItem>& items, int scr
     sc.put(1, y, when, kDim);
     sc.put(8, y, g, gs);
     int x = 10;
+    if (show_project) x = std::max(x + 1 + sc.put(x, y, fit(items[i].project, 14), kSoft), 25);
     x += 1 + sc.put(x, y, e.task, kBold);
     x += 1 + sc.put(x, y, fit(e.agent + "@" + e.machine, 18), kDim);
     sc.put(x, y, fit(msg, W - x - 1), ms);

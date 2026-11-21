@@ -82,10 +82,10 @@ Style card_border(const Item& it, bool focused) {
 }
 
 void draw_card(Screen& sc, int x, int y, int w, const Item& it, bool focused, const std::vector<Button>& buttons,
-               const Target& focus, int64_t now, int lane, int index, std::vector<Hit>& hits) {
+               const Target& focus, int64_t now, Target self, std::vector<Hit>& hits) {
   int h = card_lines(it, !buttons.empty(), w - 4) + 2;
   draw_box(sc, {x, y, w, h}, card_border(it, focused), focused);
-  hits.push_back({x, y, w, h, {Act::Card, lane, index}});
+  hits.push_back({x, y, w, h, self});
   int iw = w - 4, cx = x + 2, cy = y + 1;
   if (it.from_run) {
     Style gs = state_style(it.state);
@@ -214,7 +214,7 @@ int draw_buttons(Screen& sc, int x, int y, int w, const std::vector<Button>& but
   return bx - x;
 }
 
-void render_sidebar(Screen& sc, Rect r, const Fleet& fleet, const Target& focus, int64_t now,
+void render_sidebar(Screen& sc, Rect r, const Fleet& fleet, const Target& focus, bool all, int64_t now,
                     std::vector<Hit>& hits) {
   bool inside = focus.act == Act::Project || focus.act == Act::Session || focus.act == Act::SessionEnd ||
                 focus.act == Act::Machine || focus.act == Act::MachineRemove || focus.act == Act::AddMachine;
@@ -258,6 +258,8 @@ void render_sidebar(Screen& sc, Rect r, const Fleet& fleet, const Target& focus,
   ++y;
   sc.put(x, y, tr("Projects"), kDim);
   y += 2;
+  // Every project at once: the one scope wider than a project.
+  line({Act::Project, -1, 0}, tr("All projects"), all ? kBold : kSoft, "", kDim, nullptr, kText, 0, "", {});
   for (size_t gi = 0; gi < fleet.projects.size(); ++gi) {
     const auto& p = fleet.projects[gi];
     int g = static_cast<int>(gi);
@@ -384,13 +386,42 @@ void render_board(Screen& sc, Rect r, const Model& m, const View& v, const Targe
       if (y + h > bottom) break;
       bool with = current_lane && i == v.index && on_card;
       draw_card(sc, lx, y, lw, items[static_cast<size_t>(i)], focus == Target{Act::Card, lane, i},
-                with ? buttons : std::vector<Button>{}, focus, now, lane, i, hits);
+                with ? buttons : std::vector<Button>{}, focus, now, Target{Act::Card, lane, i}, hits);
       y += h;
     }
     if (i < static_cast<int>(items.size()) && y < bottom)
       sc.put(lx, y++, trf("{} more", {std::to_string(static_cast<int>(items.size()) - i)}), kDim);
     // Running always ends with a place to start another agent.
     if (lane == 1 && y + 3 <= bottom) draw_new_agent(sc, {lx, y, lw, 3}, focus == Target{Act::NewAgent, 0, 0}, 0, hits);
+  }
+}
+
+void render_waiting(Screen& sc, Rect r, const std::vector<WaitingCard>& cards, const Target& focus, int64_t now,
+                    std::vector<Hit>& hits) {
+  int top = r.y + 1;
+  int hx = sc.put(r.x, top, tr("Waiting for you"), kDim);
+  sc.put(r.x + hx + 1, top, std::to_string(cards.size()), kSoft);
+  if (cards.empty()) {
+    sc.put(r.x, top + 2, tr("Nothing waits for you."), kDim);
+    return;
+  }
+  // Cards in columns of a readable width, filled top to bottom.
+  int cols = std::max(1, std::min(3, (r.w + 2) / 40));
+  int cw = (r.w - 2 * (cols - 1)) / cols;
+  std::vector<int> ys(static_cast<size_t>(cols), top + 2);
+  for (size_t i = 0; i < cards.size(); ++i) {
+    int col = static_cast<int>(i) % cols;
+    int x = r.x + col * (cw + 2);
+    int& y = ys[static_cast<size_t>(col)];
+    int h = card_lines(cards[i].item, false, cw - 4) + 3;  // one more line for the project
+    if (y + h > r.y + r.h) continue;
+    Target self{Act::Waiting, static_cast<int>(i), 0};
+    bool on = focus == self;
+    sc.put(x + 1, y, fit(cards[i].project, cw - 2), on ? kFocus : kSoft);
+    draw_card(sc, x, y + 1, cw, cards[i].item, on, {}, focus, now, self, hits);
+    hits.back().y = y;  // the project's line belongs to the card
+    hits.back().h += 1;
+    y += h;
   }
 }
 

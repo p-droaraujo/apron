@@ -63,7 +63,7 @@ struct Fleet {
 enum class Act {
   None,
   Tab,            // a: view (clicked, not focused: Tab cycles views)
-  Project,        // a: project
+  Project,        // a: project; -1 is every project
   Session,        // a: project, b: session
   SessionEnd,     // a: project, b: session
   Machine,        // a: machine
@@ -72,6 +72,7 @@ enum class Act {
   Card,           // a: lane, b: index
   Button,         // a: Action, on the current card or overlay
   NewAgent,       // a placeholder that starts an agent
+  Waiting,        // a: item waiting for you, in the view of every project
   Tile,           // a: tile
 };
 
@@ -115,7 +116,8 @@ void draw_box(Screen& sc, Rect r, Style border, bool heavy);
 int draw_buttons(Screen& sc, int x, int y, int w, const std::vector<Button>& buttons, const Target& focus,
                  std::vector<Hit>& hits);
 
-void render_sidebar(Screen& sc, Rect r, const Fleet& fleet, const Target& focus, int64_t now_ms,
+// `all`: the row for every project is the one the pane shows.
+void render_sidebar(Screen& sc, Rect r, const Fleet& fleet, const Target& focus, bool all, int64_t now_ms,
                     std::vector<Hit>& hits);
 // The main pane's frame with the title on the left and the tabs on the right;
 // returns the inside.
@@ -132,6 +134,15 @@ struct Tile {
   const class Vt* vt = nullptr;
 };
 void render_grid(Screen& sc, Rect r, const std::vector<Tile>& tiles, const Target& focus, std::vector<Hit>& hits);
+
+// The view of every project: what waits for a person anywhere (questions
+// from agents, runs to review), one card each with its project.
+struct WaitingCard {
+  std::string project;
+  Item item;
+};
+void render_waiting(Screen& sc, Rect r, const std::vector<WaitingCard>& cards, const Target& focus, int64_t now_ms,
+                    std::vector<Hit>& hits);
 
 void render_footer(Screen& sc, const std::vector<std::pair<std::string, std::string>>& keys, const std::string& status);
 // A small box in the middle of `r`: a line of text being typed, or a question.

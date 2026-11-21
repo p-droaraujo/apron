@@ -47,7 +47,7 @@ apron new -- claude     # an agent in a session that outlives this terminal; Ctr
 apron                   # the screen
 ```
 
-On the screen, the left side lists your projects with their sessions, and your machines. The right side shows the selected project: its board (the plan, what is running, what waits for you, what is done), its agents live side by side, and its activity.
+On the screen, the left side lists your projects with their sessions, and your machines. The right side shows the selected project: its board (the plan, what is running, what waits for you, what is done), its agents live side by side, and its activity. Choose `All projects` at the top of the list to see every agent and every event at once, and what waits for you in any project.
 
 Everything you can do is something on the screen: a card, a button, a session, a `+ New agent` place. Move to it with the arrows and press Enter, or click it. The footer says what Enter does where you are. Besides that there are only a few keys:
 

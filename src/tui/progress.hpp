@@ -36,8 +36,9 @@ void render_log(Screen& screen, const Project& project, const std::string& run, 
 void render_task(Screen& screen, const Project& project, const std::string& task);
 
 // Activity: the newest events of every project, newest first.
-// The events of the project in the pane, newest first.
-void render_activity(Screen& sc, const std::vector<ActivityItem>& items, int scroll, int64_t now);
+// Events newest first; `show_project` when they come from several projects.
+void render_activity(Screen& sc, const std::vector<ActivityItem>& items, int scroll, int64_t now,
+                     bool show_project = false);
 
 // One finished run with its instruments: trajectory, checks, scope, changes.
 void render_review(Screen& screen, const Project& project, const RunSummary& run, const std::string& stat);

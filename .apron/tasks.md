@@ -114,6 +114,12 @@ See every agent on one screen and reach the right terminal in one keystroke.
   done-when: a third view shows one tile per live session of every machine, updating as they write, and Enter or a click opens the tile in Focus
   checks: build, test
 
+- [x] T38 "All projects" in the sidebar: the pane shows every project, with Agents and Activity of all of them and, in Progress, what waits for a person anywhere
+  scope: src/tui/**, src/cli/cmd_ui.cpp, src/core/i18n.cpp, tests/**, README.md
+  depends: T37
+  done-when: the first row of Projects is All projects; chosen, Agents shows every live session with its project, Activity every local project's events with a project column, and Progress the cards waiting for a person in any local project; Enter on one opens its project on that card and does what it asks
+  checks: build, test
+
 - [x] T37 The main pane belongs to the project chosen in the sidebar: Progress, Agents and Activity show only that project; the sidebar is the one place that shows everything
   scope: src/cli/cmd_ui.cpp, src/tui/progress.cpp, src/tui/progress.hpp, src/core/i18n.cpp, tests/**, README.md
   depends: T36
@@ -210,7 +216,7 @@ Merge with confidence without opening the editor.
 
 - [ ] T26 Worktrees and best of N: a run can live in its own git worktree, and several attempts at one task can run side by side with the checks picking the winner
   scope: src/cli/**, src/core/**, src/tui/**, tests/**, docs/**
-  depends: T23
+  depends: T19
   done-when: `apron run start --worktree` and `--attempts N` work, and the review shows the attempts side by side with their checks
   checks: build, test
 
